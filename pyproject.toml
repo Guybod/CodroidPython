@@ -1,0 +1,79 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "codroid-robot-sdk"
+dynamic = ["version"]
+description = ''
+readme = "README.md"
+requires-python = ">=3.8"
+license = "MIT"
+keywords = []
+authors = [
+  { name = "guybod", email = "b13140185898@outlook.com" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = []
+
+[project.urls]
+Documentation = "https://guybod.github.io/CodroidSDK/"
+Issues = "https://github.com/guybod/CodroidSDK/issues"
+Source = "https://github.com/guybod/CodroidSDK"
+
+[tool.hatch.version]
+path = "src/codroid/__about__.py"
+
+[tool.hatch.envs.types]
+extra-dependencies = [
+  "mypy>=1.0.0",
+]
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/codroid tests}"
+
+[tool.coverage.run]
+source_pkgs = ["codroid", "tests"]
+branch = true
+parallel = true
+omit = [
+  "src/codroid/__about__.py",
+]
+
+[tool.coverage.paths]
+codroid = ["src/codroid", "*/codroid/src/codroid"]
+tests = ["tests", "*/codroid/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]
+
+# 定义一个专门用于文档的环境
+[tool.hatch.envs.docs]
+detached = true  # 增加这一行，表示这是一个独立的、不依赖主环境的环境
+dependencies = [
+  "mkdocs-material>=9.0",
+  "mkdocstrings[python]>=0.11.0",
+  "ghp-import",
+]
+
+# 定义快捷命令
+[tool.hatch.envs.docs.scripts]
+serve = "mkdocs serve"
+build = "mkdocs build"
+deploy = "mkdocs gh-deploy --force"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/codroid"]

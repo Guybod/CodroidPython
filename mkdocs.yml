@@ -1,0 +1,34 @@
+site_name: Codroid SDK 文档
+
+# 添加这一行，移除文字显示
+extra_css:
+  - stylesheets/extra.css
+
+theme:
+  name: material  # 使用漂亮的主题
+  features:
+    - toc.follow      # 滚动时自动追踪索引
+    - navigation.top  # 回到顶部按钮
+  language: zh    # 设置 UI 语言为简体中文
+
+plugins:
+  - mkdocstrings: # 自动从代码注释提取文档
+      handlers:
+        python:
+          paths: [src] # 指向源码目录
+          options:
+            show_root_heading: true     # 必须开启，否则类名不会变成标题
+            show_root_toc_entry: true   # 显式要求将根节点加入索引
+            show_object_full_path: false # 索引里只显示类名，不显示 codroid.xxx
+            docstring_section_style: list
+            show_source: false
+
+markdown_extensions:
+  - toc:
+      permalink: True
+      toc_depth: 3  # 设置索引显示到三级标题
+
+nav:
+  - 首页: index.md
+  - 函数参考(function): api.md
+  - 数据模型(data model): model.md
