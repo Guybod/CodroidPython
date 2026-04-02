@@ -1,15 +1,21 @@
+import threading
+import socket
+import time
 from typing import Any, Dict, List, Literal, Union, Sequence
 from .network import JsonStreamClient
 from .exceptions import CodroidError
 from .models import *
 from .utils import is_valid_variable_name
+from .cri import CRIStreamHandler
+
 
 class CodroidControlInterface:
     """
     Codroid 机器人控制接口 / Codroid Robot Control Interface.
     """
     
-    def __init__(self, host: str = "192.168.1.136", port: int = 9001):
+    def __init__(self, host: str = "192.168.1.136", port: int = 9001,
+                 local_ip: str = "192.168.1.150", udp_port: int = 10086):
         """
         初始化控制接口 / Initialize the control interface.
 
@@ -20,6 +26,12 @@ class CodroidControlInterface:
         self._net = JsonStreamClient(host, port)
         self._id_counter = 1
         self.debug = False
+        # --- 新增属性 ---
+        self.local_ip = local_ip
+        self.udp_port = udp_port
+        self.cri_cache: Optional[CRIData] = None  # 实时数据缓存
+        self._cri_thread: Optional[threading.Thread] = None
+        self._stop_event = threading.Event()
 
     def _send_command(self, ty: str, db: Any = None) -> CodroidResponse:
         """
@@ -49,7 +61,9 @@ class CodroidControlInterface:
             print(payload)
         self._net.send(payload)
         raw_res = self._net.receive_one()
-        
+        if self.debug:
+            print(f"[recv]: {raw_res}")
+
         # 将原始字典映射到 CodroidResponse 模型
         response = CodroidResponse(
             id=raw_res.get("id", 0),
@@ -76,19 +90,87 @@ class CodroidControlInterface:
             CodroidControlInterface: 返回自身以支持链式调用 / Returns self for chaining.
         """
         self._net.connect()
+
+        try:
+            print(f"正在配置机器人模式 (IP: {self.local_ip}, Port: {self.udp_port})...")
+            # 1. 切换到远程模式 (内部已包含 to_auto)
+            self.to_remote()
+            time.sleep(0.2) # 增加少量延时确保模式切换完成
+            self.switch_on()
+            time.sleep(0.2) # 增加少量延时确保模式切换完成
+            
+            # 2. 先停止旧推送，再启动新推送 (不传 mask)
+            self.stop_data_push()
+            time.sleep(0.1)
+            self.start_data_push(ip=self.local_ip, port=self.udp_port)
+            
+            # 3. 启动后台接收线程 (内部固定使用 0xFFFF 和 Float64 解析)
+            self._start_cri_receiver()
+            print("实时数据同步已启动。")
+            
+        except Exception as e:
+            print(f"自动配置失败: {e}")
+            raise e
+
         return self
+
+    def _start_cri_receiver(self, mask: int = 0xFFFF):
+        """启动 UDP 接收线程"""
+        self._stop_event.clear()
+        self._cri_thread = threading.Thread(
+            target=self._cri_receiver_loop, 
+            daemon=True
+        )
+        self._cri_thread.start()
+
+    def _cri_receiver_loop(self):
+        """UDP 接收循环 (固定解析配置)"""
+        # 固定配置：Float64, 掩码全开, 6关节, 0附加轴
+        handler = CRIStreamHandler(
+            high_precision=True, 
+            mask=0xFFFF,
+            joint_count=6,
+            extra_axis_count=0
+        )
+        
+        try:
+            handler.bind(self.udp_port)
+            handler._sock.settimeout(1.0) 
+            print(f"UDP 监听已启动: {self.local_ip}:{self.udp_port}") # 调试信息
+
+            while not self._stop_event.is_set():
+                try:
+                    data, addr = handler._sock.recvfrom(2048)
+                    # --- 增加下面这行调试代码 ---
+                    if self.debug:
+                        print(f"收到来自 {addr} 的数据，长度: {len(data)} 字节")
+                    # 解析并更新缓存
+                    self.cri_cache = handler.parse_packet(data)
+                except socket.timeout:
+                    continue
+                except Exception as e:
+                    if not self._stop_event.is_set():
+                        print(f"CRI 数据接收或解析错误: {e}")
+        finally:
+            handler._sock.close()
+
 
     def close(self):
         """
         关闭连接 / Close connection.
         """
+        self.stop_data_push()
         self._net.close()
 
     def disconnect(self):
         """
         断开连接 (close 的别名) / Disconnect (alias for close).
         """
+        self.stop_data_push()
         self.close()
+
+    def get_statues(self) -> Optional[CRIData]:
+        return self.cri_cache
 
     # --- 接口实现 ---
 
@@ -967,9 +1049,8 @@ class CodroidControlInterface:
         self, 
         ip: str, 
         port: int, 
-        duration: int = 1, 
-        high_precision: bool = False, 
-        mask: CRIMask = CRIMask.TIMESTAMP | CRIMask.STATUS_1 | CRIMask.JOINT_POS | CRIMask.CARTESIAN_POS
+        duration: int = 100, 
+        high_percision: bool = True, 
     ) -> CodroidResponse:
         """
         17.2/17.4 开启数据流推送 / Start CRI data push.
@@ -977,20 +1058,20 @@ class CodroidControlInterface:
 
         Args:
             ip (str): 接收推送的本地 IP / Local IP to receive data.
-            port (int): 接收端口 (1000-65534) / Port (1000-65534).
+            port (int): 接收端口 (10000-65534) / Port (10000-65534).
             duration (int): 推送周期 (ms) / Push interval in ms.
             high_precision (bool): 是否使用双精度浮点数 (8字节) / Use Float64 (8 bytes).
             mask (CRIMask): 数据推送掩码 / Data push mask.
         """
         if port<10000 or port>65535:
-            raise CodroidError(f"接收端口 (1000-65534) / Port must in (1000-65534)")
+            raise CodroidError(f"接收端口 (10000-65534) / Port must in (10000-65534)")
         # 针对新版本（2.3.3.23+）构建 db
         db = {
             "ip": ip,
             "port": port,
             "duration": duration,
-            "highPercision": high_precision,
-            "mask": int(mask)
+            "mask": 65535,
+            "highPercision": high_percision
         }
         return self._send_command("CRI/StartDataPush", db)
 

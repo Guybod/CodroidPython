@@ -7,6 +7,7 @@ bin/
 lib/
 out/
 docs/
+up.md
 
 # === 编译器产生的中间文件 (Objects & Libraries) ===
 *.o
