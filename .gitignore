@@ -87,3 +87,11 @@ htmlcov/
 
 # 本地环境配置文件
 .env
+
+# 内部协议/设计文档（本地副本，不入库）
+AGENTS.md
+PROTOCOL_LINE_BY_LINE.md
+SDK_API_AND_DESIGN.md
+TRAJECTORY_ALGORITHM.md
+plan.md
+aaa.txt

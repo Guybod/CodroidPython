@@ -1,92 +1,88 @@
-import time
-import threading
-from codroid import CodroidControlInterface, MoveToType, MoveTarget
+#!/usr/bin/env python3
+"""
+MoveTo：Home、关节规划（Type 4）、直线规划（Type 5），配合 move_to_heartbeat 后台线程。
 
-def heartbeat_worker(robot, stop_event):
-    """
-    后台心跳线程：每 400ms 发送一次 moveToHeartbeat。
-    使用 400ms 是为了留出 100ms 的余量，确保符合 500ms 的协议要求。
-    """
-    print("[心跳] 启动运行维持心跳...")
+用法:
+  PYTHONPATH=src python examples/07_move_to.py
+  PYTHONPATH=src python examples/07_move_to.py --robot 192.168.8.136
+
+彩色横幅（可选）: pip install codroid-robot-sdk[color] 或 pip install colorama
+"""
+from __future__ import annotations
+
+import argparse
+import sys
+import threading
+import time
+
+from codroid import CodroidControlInterface, MoveToType, MoveTarget, PrintBanner
+
+
+def heartbeat_worker(robot: CodroidControlInterface, stop_event: threading.Event) -> None:
+    print("[心跳] 启动 / heartbeat start (~400ms)")
     while not stop_event.is_set():
         try:
             robot.move_to_heartbeat()
-            time.sleep(0.4) 
+            time.sleep(0.4)
         except Exception as e:
-            print(f"[心跳] 异常中断: {e}")
+            print(f"[心跳] 异常 / error: {e}")
             break
-    print("[心跳] 已停止")
+    print("[心跳] 已停止 / heartbeat stop")
 
-def moveto_demo():
-    # 1. 初始化并连接
-    with CodroidControlInterface(host="192.168.1.136") as robot:
-        
-        # 准备心跳控制工具
-        stop_event = threading.Event()
-        
-        try:
-            # --- 场景 1: 运动到预设的 Home 位置 ---
-            print("\n>>> 场景 1: 运动到 Home 位置")
+
+def main(argv: list[str]) -> int:
+    p = argparse.ArgumentParser(description="moveTo + heartbeat")
+    p.add_argument("--robot", default="192.168.8.136", help="控制器 IP")
+    args = p.parse_args(argv)
+
+    PrintBanner("07 — MoveTo", subtitle=args.robot)
+
+    stop_event = threading.Event()
+
+    try:
+        with CodroidControlInterface(host=args.robot) as robot:
+            robot.enter_remote_mode_via_auto()
+            robot.switch_on()
+
+            PrintBanner("Scene 1 — HOME", subtitle="MoveToType.HOME")
             robot.move_to(MoveToType.HOME)
-            
-            # 立即启动心跳维持
             stop_event.clear()
             t = threading.Thread(target=heartbeat_worker, args=(robot, stop_event))
             t.start()
-            
-            # 假设运动需要 3 秒
             time.sleep(3)
-            
-            # 停止心跳（模拟运动完成或需要切换指令）
             stop_event.set()
-            t.join()
+            t.join(timeout=2.0)
 
-
-            # --- 场景 2: 关节规划运动到指定坐标 (Type 4) ---
-            print("\n>>> 场景 2: 关节规划运动 (Type 4)")
-            
-            # 定义目标关节角 [j1, j2, j3, j4, j5, j6] 单位: deg
+            PrintBanner("Scene 2 — JOINT (Type 4)", subtitle="关节规划")
             target_joints = MoveTarget(jp=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-            
             robot.move_to(MoveToType.JOINT, target=target_joints)
-            
-            # 重新启动心跳
             stop_event.clear()
             t = threading.Thread(target=heartbeat_worker, args=(robot, stop_event))
             t.start()
-            
-            # 运行 5 秒
             time.sleep(5)
-            
-            # 结束心跳
             stop_event.set()
-            t.join()
+            t.join(timeout=2.0)
 
-
-            # --- 场景 3: 直线规划运动到笛卡尔坐标 (Type 5) ---
-            print("\n>>> 场景 3: 直线规划运动 (Type 5)")
-            
-            # 定义目标末端位置 [x, y, z, a, b, c]
+            PrintBanner("Scene 3 — LINEAR (Type 5)", subtitle="直线规划")
             target_pose = MoveTarget(cp=[350.0, 100.0, 400.0, 180.0, 0.0, 90.0])
-            
             robot.move_to(MoveToType.LINEAR, target=target_pose)
-            
-            # 启动心跳
             stop_event.clear()
             t = threading.Thread(target=heartbeat_worker, args=(robot, stop_event))
             t.start()
-            
             time.sleep(4)
-            
-            # 结束运动
             stop_event.set()
-            t.join()
+            t.join(timeout=2.0)
 
-            print("\n所有运动演示完成")
+        PrintBanner("07 — Done", subtitle="所有场景结束")
+    except KeyboardInterrupt:
+        stop_event.set()
+        return 130
+    except Exception as e:
+        stop_event.set()
+        print(f"错误 / Error: {e}", file=sys.stderr)
+        return 1
+    return 0
 
-        except Exception as e:
-            print(f"执行过程中发生错误: {e}")
-            stop_event.set() # 确保线程能关闭
 
 if __name__ == "__main__":
-    moveto_demo()
+    raise SystemExit(main(sys.argv[1:]))

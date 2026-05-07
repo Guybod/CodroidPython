@@ -1,30 +1,50 @@
-from codroid import CodroidControlInterface, RS485BaudRate
+#!/usr/bin/env python3
+"""
+RS485：初始化、清空、写入、按长度超时读取（示例 Modbus 帧）。
 
-def main():
-    # 使用上下文管理器确保连接关闭
-    with CodroidControlInterface() as robot:
-        # 1. 初始化 485 接口
-        print("初始化 485: 115200, N, 8, 1")
-        robot.rs485_init(baudrate=RS485BaudRate.B115200)
+用法:
+  PYTHONPATH=src python examples/05_rs485.py
+  PYTHONPATH=src python examples/05_rs485.py --robot 192.168.8.136
 
-        # 2. 清空缓存
-        robot.rs485_flush()
+彩色横幅（可选）: pip install codroid-robot-sdk[color] 或 pip install colorama
+"""
+from __future__ import annotations
 
-        # 3. 发送数据 (例如控制夹爪的指令)
-        cmd = b"\x01\x03\x00\x00\x00\x02\xC4\x0B" # 示例 Modbus 指令
-        print(f"发送数据: {cmd.hex()}")
-        robot.rs485_write(cmd)
+import argparse
+import sys
 
-        # 4. 读取响应
-        print("等待响应...")
-        res = robot.rs485_read(length=7, timeout=1000)
-        
-        if res.is_success and res.db:
-            # 这里的 res.db 是 [1, 3, 4, ...] 这种整数列表
-            received_bytes = bytes(res.db)
-            print(f"收到数据 (Hex): {received_bytes.hex()}")
-        else:
-            print("未收到数据或读取失败")
+from codroid import CodroidControlInterface, RS485BaudRate, PrintBanner
+
+
+def main(argv: list[str]) -> int:
+    p = argparse.ArgumentParser(description="RS485 init / flush / write / read")
+    p.add_argument("--robot", default="192.168.8.136", help="控制器 IP")
+    args = p.parse_args(argv)
+
+    PrintBanner("05 — RS485", subtitle=args.robot)
+
+    try:
+        with CodroidControlInterface(host=args.robot) as robot:
+            robot.enter_remote_mode_via_auto()
+            print("初始化 115200 N 8 1 / RS485 init")
+            robot.rs485_init(baudrate=RS485BaudRate.B115200)
+            robot.rs485_flush()
+
+            cmd = b"\x01\x03\x00\x00\x00\x02\xC4\x0B"
+            print(f"发送 / TX: {cmd.hex()}")
+            robot.rs485_write(cmd)
+
+            print("读取响应（7 字节，1s 超时）/ Read...")
+            res = robot.rs485_read(length=7, timeout=1000)
+            if res.is_success and res.db:
+                received = bytes(res.db)
+                print(f"收到 / RX (hex): {received.hex()}")
+            else:
+                print("未收到或失败 / No data or read failed")
+    except KeyboardInterrupt:
+        return 130
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main(sys.argv[1:]))

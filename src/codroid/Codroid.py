@@ -1,17 +1,27 @@
+"""
+协议会话与指令实现（原 ``CodroidControlInterface`` 模块；与 C# ``CodroidClient`` 能力对应）。
+
+对外类：``CodroidSession``；``CodroidControlInterface`` 为兼容别名。
+"""
+from __future__ import annotations
+
 import threading
 import socket
 import time
-from typing import Any, Dict, List, Literal, Union, Sequence
-from .network import JsonStreamClient
+from typing import Any, Dict, List, Literal, Optional, Union, Sequence, cast
+from .async_tcp_client import JsonStreamClient
 from .exceptions import CodroidError
-from .models import *
+from .define import *
 from .utils import is_valid_variable_name
-from .cri import CRIStreamHandler
+from .cri_realtime_packet_parser import CriRealtimePacketParser, CriStreamHandler
 
 
-class CodroidControlInterface:
+class CodroidSession:
     """
-    Codroid 机器人控制接口 / Codroid Robot Control Interface.
+    TCP/UDP 协议会话与指令封装。
+
+    C# 侧等价能力内聚于 ``CodroidClient``；Python 中 ``CodroidClient`` 继承本类并替换传输层。
+    对外请优先使用 ``CodroidClient``；方法名与 AGENTS.md §4.1 词序一致（snake_case）。
     """
     
     def __init__(self, host: str = "192.168.1.136", port: int = 9001,
@@ -29,11 +39,11 @@ class CodroidControlInterface:
         # --- 新增属性 ---
         self.local_ip = local_ip
         self.udp_port = udp_port
-        self.cri_cache: Optional[CRIData] = None  # 实时数据缓存
+        self.cri_cache: Optional[CriRealTimeData] = None  # 实时数据缓存
         self._cri_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
 
-    def _send_command(self, ty: str, db: Any = None) -> CodroidResponse:
+    def _send_command(self, ty: str, db: Any = None) -> CommonResponse:
         """
         内部指令发送逻辑 / Internal command transmission logic.
 
@@ -42,7 +52,7 @@ class CodroidControlInterface:
             db (Any): 请求数据 / Request data.
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         self._id_counter += 1
         # 构造请求模型
@@ -64,8 +74,8 @@ class CodroidControlInterface:
         if self.debug:
             print(f"[recv]: {raw_res}")
 
-        # 将原始字典映射到 CodroidResponse 模型
-        response = CodroidResponse(
+        # 将原始字典映射到 CommonResponse 模型
+        response = CommonResponse(
             id=raw_res.get("id", 0),
             ty=raw_res.get("ty", ""),
             db=raw_res.get("db"),
@@ -82,40 +92,28 @@ class CodroidControlInterface:
 
     # --- 连接管理 / Connection Management ---
 
-    def connect(self) -> "CodroidControlInterface":
+    def connect(self) -> "CodroidSession":
         """
         建立 TCP 连接 / Establish TCP connection.
 
         Returns:
-            CodroidControlInterface: 返回自身以支持链式调用 / Returns self for chaining.
+            CodroidSession: 返回自身以支持链式调用 / Returns self for chaining.
         """
         self._net.connect()
 
-        try:
-            print(f"正在配置机器人模式 (IP: {self.local_ip}, Port: {self.udp_port})...")
-            # 1. 切换到远程模式 (内部已包含 to_auto)
-            self.to_remote()
-            time.sleep(0.2) # 增加少量延时确保模式切换完成
-            self.switch_on()
-            time.sleep(0.2) # 增加少量延时确保模式切换完成
-            
-            # 2. 先停止旧推送，再启动新推送 (不传 mask)
-            self.stop_data_push()
-            time.sleep(0.1)
-            self.start_data_push(ip=self.local_ip, port=self.udp_port)
-            
-            # 3. 启动后台接收线程 (内部固定使用 0xFFFF 和 Float64 解析)
-            self._start_cri_receiver()
-            print("实时数据同步已启动。")
-            
-        except Exception as e:
-            print(f"自动配置失败: {e}")
-            raise e
-
         return self
+
+    def _stop_cri_receiver(self) -> None:
+        """停止 CRI UDP 接收线程并释放绑定端口（避免 Address already in use）。"""
+        self._stop_event.set()
+        t = self._cri_thread
+        self._cri_thread = None
+        if t is not None and t.is_alive():
+            t.join(timeout=5.0)
 
     def _start_cri_receiver(self, mask: int = 0xFFFF):
         """启动 UDP 接收线程"""
+        self._stop_cri_receiver()
         self._stop_event.clear()
         self._cri_thread = threading.Thread(
             target=self._cri_receiver_loop, 
@@ -124,28 +122,30 @@ class CodroidControlInterface:
         self._cri_thread.start()
 
     def _cri_receiver_loop(self):
-        """UDP 接收循环 (固定解析配置)"""
-        # 固定配置：Float64, 掩码全开, 6关节, 0附加轴
-        handler = CRIStreamHandler(
-            high_precision=True, 
+        """UDP 接收循环 (固定 308 字节布局，见 AGENTS.md §2.3)"""
+        handler = CriStreamHandler(
+            high_precision=True,
             mask=0xFFFF,
             joint_count=6,
-            extra_axis_count=0
+            extra_axis_count=0,
         )
-        
+
         try:
             handler.bind(self.udp_port)
-            handler._sock.settimeout(1.0) 
-            print(f"UDP 监听已启动: {self.local_ip}:{self.udp_port}") # 调试信息
+            handler._sock.settimeout(1.0)
+            print(f"UDP 监听已启动: {self.local_ip}:{self.udp_port}")  # 调试信息
 
             while not self._stop_event.is_set():
                 try:
                     data, addr = handler._sock.recvfrom(2048)
-                    # --- 增加下面这行调试代码 ---
                     if self.debug:
                         print(f"收到来自 {addr} 的数据，长度: {len(data)} 字节")
-                    # 解析并更新缓存
-                    self.cri_cache = handler.parse_packet(data)
+                    parsed = CriRealtimePacketParser.parse(data)
+                    if parsed is None:
+                        if self.debug:
+                            print(f"跳过非 308 字节 CRI 包: {len(data)} 字节")
+                        continue
+                    self.cri_cache = parsed
                 except socket.timeout:
                     continue
                 except Exception as e:
@@ -159,31 +159,54 @@ class CodroidControlInterface:
         """
         关闭连接 / Close connection.
         """
-        self.stop_data_push()
-        self._net.close()
+        try:
+            self.stop_cri_data_push()
+        finally:
+            self._stop_cri_receiver()
+            self._net.close()
 
     def disconnect(self):
         """
         断开连接 (close 的别名) / Disconnect (alias for close).
         """
-        self.stop_data_push()
         self.close()
 
-    def get_statues(self) -> Optional[CRIData]:
+    def get_cri_data(self) -> Optional[CriRealTimeData]:
+        """最新 CRI 快照，等价 C# 侧 ``CriData`` 缓存（``cri_cache``）。"""
         return self.cri_cache
+
+    def start_listen_udp(self): 
+        try:            
+            # 1. 先停止旧的推送
+            self.stop_cri_data_push()
+            time.sleep(0.1)
+            
+            # 2. 先在本地打开 UDP 监听端口
+            self._start_cri_receiver() 
+            
+            # 3. 再通知机器人开始推送数据
+            self.start_cri_data_push(ip=self.local_ip, port=self.udp_port)
+            
+            if self.debug:
+                print(f"实时数据同步已开启，监听端口: {self.udp_port}")
+                
+        except Exception as e:
+            # 二进制环境下，务必捕获并打印具体的异常
+            print(f"UDP 监听启动失败: {type(e).__name__}: {e}")
+            raise e
 
     # --- 接口实现 ---
 
-    def __run_script(self, main_script: str, vars: Dict[str, Any] | None = None) -> CodroidResponse:
+    def run_script(self, main_script: str, vars: Optional[Dict[str, Any]] = None) -> CommonResponse:
         """
-        2.1 运行脚本 / Run script.
+        2.1 运行脚本 / Run script（C# ``RunScript``）。
 
         Args:
             main_script (str): Lua 脚本代码 / Lua script code.
-            vars (Dict[str, Any] | None): 脚本共享变量 / Shared variables for the script.
+            vars: 脚本共享变量 / Shared variables for the script.
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         db = {
             "scripts": {"main": main_script},
@@ -191,16 +214,20 @@ class CodroidControlInterface:
         }
         return self._send_command("project/runScript", db)
 
-    def enter_remote_script_mode(self) -> CodroidResponse:
+    def __run_script(self, main_script: str, vars: Optional[Dict[str, Any]] = None) -> CommonResponse:
+        """兼容旧代码调用 ``__run_script``。"""
+        return self.run_script(main_script, vars)
+
+    def enter_remote_script_mode(self) -> CommonResponse:
         """
         2.2 进入远程脚本模式 / Enter remote script mode.
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         return self._send_command("project/enterRemoteScriptMode")
 
-    def run_project(self, project_id: str) -> CodroidResponse:
+    def run_project(self, project_id: str) -> CommonResponse:
         """
         2.3 运行指定工程 / Run specified project.
 
@@ -208,60 +235,56 @@ class CodroidControlInterface:
             project_id (str): 工程唯一标识 ID / Unique project ID.
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         return self._send_command("project/run", {"id": project_id})
 
-    def run_project_by_index(self, index: int) -> CodroidResponse:
+    def run_project_by_index(self, index: int) -> CommonResponse:
         """
-        2.4 通过索引号运行工程 / Run project by index.
+        2.4 通过索引号运行工程 / Run project by index（C# ``RunByIndex``）。
 
         Args:
             index (int): 工程映射索引号 / Project mapping index.
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         return self._send_command("project/runByIndex", index)
 
-    def run_step(self,projectID: str) -> CodroidResponse:
+    def run_step(self, project_id: str) -> CommonResponse:
         """
-        2.5 单步运行 / run project with step.
-
-        Returns:
-            CodroidResponse: 响应对象 / Response object.
+        2.5 单步运行（C# ``RunStep``）。
         """
-        db = {"id":projectID}
-        return self._send_command("project/run",db)
+        return self._send_command("project/run", {"id": project_id})
 
-    def pause_project(self) -> CodroidResponse:
+    def pause_project(self) -> CommonResponse:
         """
         2.6 暂停工程 / Pause project.
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         return self._send_command("project/pause")
 
-    def resume_project(self) -> CodroidResponse:
+    def resume_project(self) -> CommonResponse:
         """
         2.7 恢复运行 / Resume project.
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         return self._send_command("project/resume")
 
-    def stop_project(self) -> CodroidResponse:
+    def stop_project(self) -> CommonResponse:
         """
         2.8 停止运行 / Stop project.
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         return self._send_command("project/stop")
 
-    def set_start_line(self, line: int) -> CodroidResponse:
+    def set_start_line(self, line: int) -> CommonResponse:
         """
         2.13 设置启动行 / Set start line.
 
@@ -269,37 +292,44 @@ class CodroidControlInterface:
             line (int): 主程序开始执行的行号 / Starting line number.
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         return self._send_command("project/setStartLine", line)
 
-    def clear_start_line(self) -> CodroidResponse:
+    def clear_start_line(self) -> CommonResponse:
         """
         2.14 清除启动行设置 / Clear start line setting.
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         return self._send_command("project/clearStartLine")
 
     def get_global_vars(self):
         """
-        3.2 获取全局变量 / Get global variables.
+        3.2 获取全局变量 / Get global variables（C# ``GetGlobalVars``）。
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         return self._send_command("globalVar/getVars")
 
-    def save_global_variables(self, variables: Dict[str, GlobalVariable]) -> CodroidResponse:
+    def get_global_vars_catalog(self):
         """
-        3.3 保存全局变量 / Save global variables.
+        C# ``GetGlobalVarsCatalog``：与 ``get_global_vars`` 相同 TCP 请求（``globalVar/getVars``）；
+        C# 侧再经 ``GlobalVarCatalogParser`` 解析；Python 当前直接返回原始 ``CommonResponse``。
+        """
+        return self.get_global_vars()
+
+    def save_global_vars(self, variables: Dict[str, GlobalVariable]) -> CommonResponse:
+        """
+        3.3 保存全局变量 / Save global variables（C# ``SaveGlobalVars``）。
 
         Args:
             variables (Dict[str, GlobalVariable]): 变量名与变量对象的映射 / Map of variable names to GlobalVariable objects.
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         db_payload = {}
         
@@ -312,16 +342,20 @@ class CodroidControlInterface:
             db_payload[var_name] = var_obj.to_robot_format()
             
         return self._send_command("globalVar/saveVars", db_payload)
+
+    def save_global_var(self, name: str, variable: GlobalVariable) -> CommonResponse:
+        """C# ``SaveGlobalVar``：单变量增量保存。"""
+        return self.save_global_vars({name: variable})
     
-    def remove_global_variables(self, names: List[str]) -> CodroidResponse:
+    def remove_global_vars(self, names: List[str]) -> CommonResponse:
         """
-        3.4 删除全局变量 / Remove global variables.
+        3.4 删除全局变量 / Remove global variables（C# ``RemoveGlobalVars``）。
 
         Args:
             names (List[str]): 要删除的变量名列表 / List of variable names to remove.
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         # 校验变量名合法性
         for name in names:
@@ -335,7 +369,7 @@ class CodroidControlInterface:
         4.1 获取当前所有工程变量值(仅在工程运行中有效) / Get the values of all current project variables (only valid when the project is running)
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         return self._send_command("globalVar/GetProjectVarUpdate")
 
@@ -343,7 +377,7 @@ class CodroidControlInterface:
         self, baudrate: Union[RS485BaudRate, int], 
         stop_bit: RS485StopBits = RS485StopBits.ONE, 
         parity: RS485Parity = RS485Parity.NONE
-    ) -> CodroidResponse:
+    ) -> CommonResponse:
         """
         5.1 初始化末端 485 / Initialize RS485.
 
@@ -353,7 +387,7 @@ class CodroidControlInterface:
             parity (RS485Parity): 校验位 / Parity mode.
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         db = {
             "baudrate": int(baudrate),
@@ -363,16 +397,16 @@ class CodroidControlInterface:
         }
         return self._send_command("EC2RS485/init", db)
 
-    def rs485_flush(self) -> CodroidResponse:
+    def rs485_flush(self) -> CommonResponse:
         """
         5.2 清空 485 读取缓存 / Flush RS485 read buffer.
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         return self._send_command("EC2RS485/flushReadBuffer")
 
-    def rs485_read(self, length: int, timeout: int = 3000) -> CodroidResponse:
+    def rs485_read(self, length: int, timeout: int = 3000) -> CommonResponse:
         """
         5.3 读取 485 数据 / Read RS485 data.
 
@@ -381,7 +415,7 @@ class CodroidControlInterface:
             timeout (int): 超时时间 ms (max 3000) / Timeout in ms (max 3000).
 
         Returns:
-            CodroidResponse: 响应对象，db 字段为字节数组 / Response object, 'db' field is a list of bytes.
+            CommonResponse: 响应对象，db 字段为字节数组 / Response object, 'db' field is a list of bytes.
         """
         if length > 128:
             raise CodroidError("单次读取长度不能超过 128 字节")
@@ -394,7 +428,7 @@ class CodroidControlInterface:
         }
         return self._send_command("EC2RS485/read", db)
 
-    def rs485_write(self, data: Union[List[int], bytes]) -> CodroidResponse:
+    def rs485_write(self, data: Union[List[int], bytes]) -> CommonResponse:
         """
         5.4 发送 485 数据 / Write RS485 data.
 
@@ -402,7 +436,7 @@ class CodroidControlInterface:
             data (Union[List[int], bytes]): 要发送的数据 / Data to send.
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         # 如果用户传的是 bytes，转换成 list[int]
         if isinstance(data, bytes):
@@ -417,15 +451,15 @@ class CodroidControlInterface:
 
     # --- 10. 机器人计算接口 / Robot Calculation ---
 
-    def forward_kinematics(
+    def apos_to_cpos(
         self, 
         jp: Sequence[float], 
         coor: Optional[Sequence[float]] = None, 
         tool: Optional[Sequence[float]] = None, 
         ep: Sequence[float] = []
-    ) -> CodroidResponse:
+    ) -> CommonResponse:
         """
-        10.1 正解计算 (关节空间 -> 笛卡尔空间) / Forward Kinematics.
+        10.1 正解 (关节 → 笛卡尔) / Forward kinematics（C# ``AposToCpos`` / ``AposToCposPose``）。
 
         Args:
             jp (Sequence[float]): 6个关节角 [j1...j6], 单位: deg / 6 joint angles in deg.
@@ -434,7 +468,7 @@ class CodroidControlInterface:
             ep (Sequence[float]): 附加轴位置 / Additional axis positions.
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         db: Dict[str, Any] = {
             "jp": jp,
@@ -448,14 +482,14 @@ class CodroidControlInterface:
             
         return self._send_command("Robot/apostocpos", db)
 
-    def inverse_kinematics(
+    def cpos_to_apos(
         self, 
         cp: Sequence[float], 
         rj: Optional[Sequence[float]] = None, 
         ep: Sequence[float] = []
-    ) -> CodroidResponse:
+    ) -> CommonResponse:
         """
-        10.2 逆解计算 (笛卡尔空间 -> 关节空间) / Inverse Kinematics.
+        10.2 逆解 (笛卡尔 → 关节) / Inverse kinematics（C# ``CposToApos`` / ``CposToAposJoints``）。
 
         Args:
             cp (Sequence[float]): 末端位置 [x,y,z,a,b,c] / TCP pose.
@@ -463,7 +497,7 @@ class CodroidControlInterface:
             ep (Sequence[float]): 附加轴位置 / Additional axis positions.
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         # 处理默认参考关节角
         if rj is None:
@@ -483,7 +517,7 @@ class CodroidControlInterface:
         coor_type: CoordinateType = CoordinateType.TOOL,
         pos_coor: Optional[Sequence[float]] = None,
         coor: Optional[Sequence[float]] = None
-    ) -> CodroidResponse:
+    ) -> CommonResponse:
         """
         10.3 笛卡尔坐标偏移计算 / Calculate relative pose.
 
@@ -508,16 +542,16 @@ class CodroidControlInterface:
 
     # --- 11. 机器人运动控制接口 / Robot Motion Control ---
 
-    def jog(
+    def start_jog(
         self, 
         mode: JogMode, 
         index: int, 
         speed: float, 
         coor_type: JogCoorType = JogCoorType.USER, 
         coor_id: int = 1
-    ) -> CodroidResponse:
+    ) -> CommonResponse:
         """
-        11.1 启动机器人点动 / Start robot jogging.
+        11.1 启动点动 / Start jog（C# ``StartJog``）。
         注意：需要每 500ms 调用一次 jog_heartbeat() 维持运动。
 
         Args:
@@ -536,13 +570,13 @@ class CodroidControlInterface:
         }
         return self._send_command("Robot/jog", db)
 
-    def stop_jog(self) -> CodroidResponse:
+    def stop_jog(self) -> CommonResponse:
         """
         11.2 停止点动 / Stop robot jogging.
         """
         return self._send_command("Robot/stopJog", "")
 
-    def jog_heartbeat(self) -> CodroidResponse:
+    def jog_heartbeat(self) -> CommonResponse:
         """
         11.3 点动心跳 / Jog heartbeat.
         需在点动期间每隔 0.5s 发送一次。
@@ -553,7 +587,7 @@ class CodroidControlInterface:
         self, 
         move_type: MoveToType, 
         target: Optional[MoveTarget] = None
-    ) -> CodroidResponse:
+    ) -> CommonResponse:
         """
         11.4 运动到指定位置 / Move to specified position.
         注意：启动后需每隔 0.5s 调用 move_to_heartbeat() 维持运动。
@@ -568,13 +602,13 @@ class CodroidControlInterface:
             
         return self._send_command("Robot/moveTo", db)
 
-    def move_to_heartbeat(self) -> CodroidResponse:
+    def move_to_heartbeat(self) -> CommonResponse:
         """
         11.5 moveTo 心跳 / MoveTo heartbeat.
         """
         return self._send_command("Robot/moveToHeartbeat")
 
-    def set_manual_move_rate(self, rate: int) -> CodroidResponse:
+    def set_manual_move_rate(self, rate: int) -> CommonResponse:
         """
         11.6 设置手动运动倍率 / Set manual move rate.
 
@@ -585,7 +619,7 @@ class CodroidControlInterface:
             raise CodroidError("倍率范围必须在 1~100 之间 / The magnification range must be between 1 and 100")
         return self._send_command("Robot/setManualMoveRate", rate)
 
-    def set_auto_move_rate(self, rate: int) -> CodroidResponse:
+    def set_auto_move_rate(self, rate: int) -> CommonResponse:
         """
         11.7 设置自动运动倍率 / Set auto move rate.
 
@@ -596,9 +630,26 @@ class CodroidControlInterface:
             raise CodroidError("倍率范围必须在 1~100 之间 / The magnification range must be between 1 and 100")
         return self._send_command("Robot/setAutoMoveRate", rate)
 
-    def _send_move_commands(self, commands: List[Dict[str, Any]]) -> CodroidResponse:
-        """内部通用方法：发送运动指令列表"""
+    def _send_move_commands(self, commands: List[Dict[str, Any]]) -> CommonResponse:
+        """内部：发送 ``Robot/move`` 指令列表。"""
         return self._send_command("Robot/move", commands)
+
+    def move(self, commands: Union[MotionPath, List[Dict[str, Any]]]) -> CommonResponse:
+        """
+        11.8 运动指令列表（C# ``Move`` / ``Robot/move``）。
+
+        可传入 ``MotionPath``（与 ``execute_path`` 等价）或已序列化的指令 dict 列表
+        （与 ``MotionPath.get_commands()`` 形态一致）。
+        """
+        if isinstance(commands, MotionPath):
+            cmds = commands.get_commands()
+            if not cmds:
+                raise CodroidError("路径不能为空 / Path cannot be empty")
+            return self._send_move_commands(cmds)
+        cmds = cast(List[Dict[str, Any]], commands)
+        if not cmds:
+            raise CodroidError("运动指令列表不能为空 / Move command list cannot be empty")
+        return self._send_move_commands(cmds)
 
     def _build_move_item(
         self, 
@@ -646,7 +697,7 @@ class CodroidControlInterface:
         blend: float = 0.0,
         coor: Optional[Sequence[float]] = None,
         tool: Optional[Sequence[float]] = None
-    ) -> CodroidResponse:
+    ) -> CommonResponse:
         """
         关节运动 (movJ)。
         """
@@ -661,7 +712,7 @@ class CodroidControlInterface:
         blend: float = 0.0,
         coor: Optional[Sequence[float]] = None,
         tool: Optional[Sequence[float]] = None
-    ) -> CodroidResponse:
+    ) -> CommonResponse:
         """
         直线运动 (movL)。
         """
@@ -677,7 +728,7 @@ class CodroidControlInterface:
         blend: float = 0.0,
         coor: Optional[Sequence[float]] = None,
         tool: Optional[Sequence[float]] = None
-    ) -> CodroidResponse:
+    ) -> CommonResponse:
         """
         圆弧运动 (movC)。
         注意：必须传入笛卡尔坐标点 (cp)。
@@ -696,7 +747,7 @@ class CodroidControlInterface:
         circle_num: int = 1,
         coor: Optional[Sequence[float]] = None,
         tool: Optional[Sequence[float]] = None
-    ) -> CodroidResponse:
+    ) -> CommonResponse:
         """
         圆周运动 (movCircle)。
         """
@@ -708,127 +759,126 @@ class CodroidControlInterface:
         )
         return self._send_move_commands([item])
 
-    def execute_path(self, path: MotionPath) -> CodroidResponse:
+    def execute_path(self, path: MotionPath) -> CommonResponse:
         """
-        11.8 执行运动路径 / Execute a motion path.
-
-        Args:
-            path (MotionPath): 构建好的路径对象 / Pre-built MotionPath object.
-
-        Returns:
-            CodroidResponse: 响应对象 / Response object.
+        11.8 执行运动路径 / Execute a motion path（内部即 ``move(path)``）。
         """
-        commands = path.get_commands()
-        if not commands:
-            raise CodroidError("路径不能为空 / Path cannot be empty")
-        return self._send_command("Robot/move", commands)
+        return self.move(path)
 
     # --- 11.9 - 11.11 运动控制 ---
 
-    def pause_move(self) -> CodroidResponse:
-        """11.9 暂停运动 / pause move"""
+    def pause_robot_motion(self) -> CommonResponse:
+        """11.9 暂停运动 / Pause robot motion（C# ``PauseRobotMotion``）。"""
         return self._send_command("Robot/pause", "")
 
-    def resume_move(self) -> CodroidResponse:
-        """11.10 恢复运动 / resume move"""
+    def resume_robot_motion(self) -> CommonResponse:
+        """11.10 恢复运动 / Resume robot motion（C# ``ResumeRobotMotion``）。"""
         return self._send_command("Robot/resume", "")
 
-    def stop_move(self) -> CodroidResponse:
-        """11.11 停止运动 / stop move"""
+    def stop_robot_move(self) -> CommonResponse:
+        """11.11 停止运动 / Stop robot move（C# ``StopRobotMove``）。"""
         return self._send_command("Robot/stopMove", "")
 
     # --- 12. 机器人控制命令 / Robot Control Commands ---
 
-    def switch_on(self) -> CodroidResponse:
+    def switch_on(self) -> CommonResponse:
         """
         12.1 上使能 / Enable the robot.
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         return self._send_command("Robot/switchOn", "")
 
-    def switch_off(self) -> CodroidResponse:
+    def switch_off(self) -> CommonResponse:
         """
         12.2 下使能 / Disable the robot.
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         return self._send_command("Robot/switchOff", "")
 
-    def to_manual(self) -> CodroidResponse:
+    def to_manual(self) -> CommonResponse:
         """
-        12.3 进入手动模式 / Switch to manual mode.
+        12.3 进入手动模式 / ``Robot/toManual``（C# ``ToManual``，不含模式跳转组合）。
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
-        self.to_auto()
         return self._send_command("Robot/toManual", "")
 
-    def to_auto(self) -> CodroidResponse:
+    def enter_manual_mode_via_auto(self) -> CommonResponse:
+        """12.3 C# ``EnterManualModeViaAuto``：先 ``ToAuto`` 再 ``ToManual``。"""
+        self.to_auto()
+        return self.to_manual()
+
+    def to_auto(self) -> CommonResponse:
         """
         12.4 进入自动模式 / Switch to auto mode.
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         return self._send_command("Robot/toAuto", "")
 
-    def to_remote(self) -> CodroidResponse:
+    def to_remote(self) -> CommonResponse:
         """
-        12.5 进入远程模式 / Switch to remote mode.
+        12.5 进入远程模式 / ``Robot/toRemote``（C# ``ToRemote``，不含前置 Auto）。
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
-        self.to_auto()
         return self._send_command("Robot/toRemote", "")
 
-    def to_simulation(self) -> CodroidResponse:
+    def enter_remote_mode_via_auto(self) -> CommonResponse:
+        """12.5 C# ``EnterRemoteModeViaAuto``：先 ``ToAuto`` 再 ``ToRemote``。"""
+        self.to_auto()
+        return self.to_remote()
+
+    def to_simulation(self) -> CommonResponse:
         """
         12.7 进入仿真模式 / Switch to simulation mode.
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         return self._send_command("Robot/toSimulation", "")
 
-    def to_actual(self) -> CodroidResponse:
+    def to_actual(self) -> CommonResponse:
         """
         12.8 进入实机模式 / Switch to actual mode.
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         return self._send_command("Robot/toActual", "")
 
-    def start_drag(self) -> CodroidResponse:
+    def start_drag(self) -> CommonResponse:
         """
         12.9 进入拖拽模式 / Enable drag-and-teach mode.
         注意：只可在远程模式和手动模式下使用 / Note: Only available in remote or manual mode.
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         return self._send_command("Robot/startDrag", "")
 
-    def stop_drag(self) -> CodroidResponse:
+    def stop_drag(self) -> CommonResponse:
         """
         12.10 退出拖拽模式 / Disable drag-and-teach mode.
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         return self._send_command("Robot/stopDrag", "")
 
-    def clear_error(self) -> CodroidResponse:
+    def clear_system_error(self) -> CommonResponse:
         """
-        12.11 清除错误 / Clear system errors.
+        12.11 清除错误 / Clear system errors（C# ``ClearSystemError``，协议 ``System/clearError``）。
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         return self._send_command("System/clearError", "")
 
@@ -845,7 +895,7 @@ class CodroidControlInterface:
 
     # --- 13.1 获取 IO 相关接口 / Get IO Interface ---
 
-    def get_io_values(self, io_requests: List[Dict[str, Any]]) -> CodroidResponse:
+    def get_io_values(self, io_requests: List[Dict[str, Any]]) -> CommonResponse:
         """
         13.1 获取多个 IO 的当前值 / Get multiple IO values.
         
@@ -922,7 +972,7 @@ class CodroidControlInterface:
 
     # --- 13.2 写入 IO 相关接口 / Set IO Interface ---
 
-    def set_do(self, port: int, value: int) -> CodroidResponse:
+    def set_do(self, port: int, value: int) -> CommonResponse:
         """
         设置数字输出 (DO) 值 / Set Digital Output value.
 
@@ -937,7 +987,7 @@ class CodroidControlInterface:
         db = {"type": IOType.DO, "port": port, "value": value}
         return self._send_command("IOManager/SetIOValue", db)
 
-    def set_ao(self, port: int, value: float) -> CodroidResponse:
+    def set_ao(self, port: int, value: float) -> CommonResponse:
         """
         设置模拟输出 (AO) 值 / Set Analog Output value.
 
@@ -949,7 +999,7 @@ class CodroidControlInterface:
         db = {"type": IOType.AO, "port": port, "value": value}
         return self._send_command("IOManager/SetIOValue", db)
 
-    def set_io_values(self, io_list: List[Dict[str, Any]]) -> List[CodroidResponse]:
+    def set_io_values(self, io_list: List[Dict[str, Any]]) -> List[CommonResponse]:
         """
         批量设置 IO 值 / Bulk set IO values.
         注：由于协议 13.2 是单点设置，此处通过循环调用实现。
@@ -967,7 +1017,7 @@ class CodroidControlInterface:
 
     # --- 14. 寄存器相关接口 / Register Interface ---
 
-    def get_register_values(self, addresses: List[int]) -> CodroidResponse:
+    def get_register_values(self, addresses: List[int]) -> CommonResponse:
         """
         14.1 获取多个寄存器值 / Get multiple register values.
 
@@ -975,7 +1025,7 @@ class CodroidControlInterface:
             addresses (List[int]): 寄存器地址列表 / List of register addresses.
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         return self._send_command("RegisterManager/GetRegisterValue", addresses)
 
@@ -994,7 +1044,7 @@ class CodroidControlInterface:
             return res.db[0]["value"]
         raise CodroidError(f"无法获取寄存器 {address} 的值 / Failed to get register value.")
 
-    def set_register_value(self, address: int, value: Any) -> CodroidResponse:
+    def set_register_value(self, address: int, value: Any) -> CommonResponse:
         """
         14.2 写入寄存器值 / Set a single register value.
 
@@ -1003,12 +1053,12 @@ class CodroidControlInterface:
             value (Any): 要写入的值 / Value to write.
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         db = {"address": address, "value": value}
         return self._send_command("RegisterManager/SetRegisterValue", db)
 
-    def set_extend_array_type(self, index: int, data_type: ExtendArrayType) -> CodroidResponse:
+    def set_extend_array_type(self, index: int, data_type: ExtendArrayType) -> CommonResponse:
         """
         14.3 设置扩展数组数据类型 / Set extended array data type.
 
@@ -1017,7 +1067,7 @@ class CodroidControlInterface:
             data_type (ExtendArrayType): 数据类型枚举 / Data type enum.
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         if not (0 <= index <= 999):
             raise CodroidError(f"扩展数组索引范围错误: {index} (应为 0~999) / Invalid index.")
@@ -1028,7 +1078,7 @@ class CodroidControlInterface:
         }
         return self._send_command("RegisterManager/setExtendArrayType", db)
 
-    def remove_extend_array(self, index: int) -> CodroidResponse:
+    def remove_extend_array(self, index: int) -> CommonResponse:
         """
         14.4 删除扩展数组索引 (重置数据) / Remove extended array index.
 
@@ -1036,7 +1086,7 @@ class CodroidControlInterface:
             index (int): 数组索引 (0-999) / Array index (0-999).
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         if not (0 <= index <= 999):
             raise CodroidError(f"扩展数组索引范围错误: {index} (应为 0~999)")
@@ -1045,75 +1095,105 @@ class CodroidControlInterface:
 
     # --- 17. CRI 实时控制接口 / Codroid RealTime Interface ---
 
-    def start_data_push(
-        self, 
-        ip: str, 
-        port: int, 
-        duration: int = 100, 
-        high_percision: bool = True, 
-    ) -> CodroidResponse:
+    def start_cri_data_push(
+        self,
+        ip: str,
+        port: int,
+        duration: int = 100,
+        high_percision: bool = True,
+        mask: int = 0xFFFF,
+    ) -> CommonResponse:
         """
-        17.2/17.4 开启数据流推送 / Start CRI data push.
-        支持自动识别版本切换参数格式。
+        17.2/17.4 开启 CRI UDP 推送 / Start CRI data push（C# ``StartCriDataPush``，``CRI/StartDataPush``）。
 
         Args:
-            ip (str): 接收推送的本地 IP / Local IP to receive data.
-            port (int): 接收端口 (10000-65534) / Port (10000-65534).
-            duration (int): 推送周期 (ms) / Push interval in ms.
-            high_precision (bool): 是否使用双精度浮点数 (8字节) / Use Float64 (8 bytes).
-            mask (CRIMask): 数据推送掩码 / Data push mask.
+            ip: 本机接收 IP。
+            port: 本机 UDP 端口（10000–65534）。
+            duration: 推送周期 (ms)。
+            high_percision: 是否双精度（协议字段名 ``highPercision`` 拼写固定）。
+            mask: 位掩码，默认 ``0xFFFF``。
         """
-        if port<10000 or port>65535:
-            raise CodroidError(f"接收端口 (10000-65534) / Port must in (10000-65534)")
-        # 针对新版本（2.3.3.23+）构建 db
+        if port < 10000 or port > 65534:
+            raise CodroidError("接收端口须在 10000–65534 / Port must be in (10000-65534)")
         db = {
             "ip": ip,
             "port": port,
             "duration": duration,
-            "mask": 65535,
-            "highPercision": high_percision
+            "mask": int(mask),
+            "highPercision": high_percision,
         }
         return self._send_command("CRI/StartDataPush", db)
 
-    def stop_data_push(self, ip: Optional[str] = None, port: Optional[int] = None) -> CodroidResponse:
+    def stop_cri_data_push(self, ip: Optional[str] = None, port: Optional[int] = None) -> CommonResponse:
         """
-        17.3/17.5 停止数据流推送 / Stop CRI data push.
+        17.3/17.5 停止 CRI 推送 / Stop CRI data push（C# ``StopCriDataPush``）。
         """
         db = {}
         if ip and port:
             db = {"ip": ip, "port": port}
-        return self._send_command("CRI/StopDataPush", db if db else "")
+        try:
+            return self._send_command("CRI/StopDataPush", db if db else "")
+        finally:
+            self._stop_cri_receiver()
 
-    def start_realtime_control(
-        self, 
-        filter_type: CRIFilterType = CRIFilterType.NONE, 
-        duration: int = 1, 
-        start_buffer: int = 3
-    ) -> CodroidResponse:
+    def start_cri_control(
+        self,
+        filter_type: CriFilterType = CriFilterType.NONE,
+        duration: int = 1,
+        start_buffer: int = 3,
+    ) -> CommonResponse:
         """
-        17.6 开启实时控制模式 / Start real-time control mode.
+        17.6 开启实时控制 / Start CRI control mode（C# ``StartCriControl``，``CRI/StartControl``）。
 
         Args:
-            filter_type (CRIFilterType): 滤波类型 / Filter type.
-            duration (int): 指令间隔 (1-16ms) / Command interval.
-            start_buffer (int): 启动缓冲点数 (1-100) / Start buffer points.
+            filter_type: 滤波类型。
+            duration: 指令间隔 ms（1–16，且可整除 1000）。
+            start_buffer: 启动缓冲点数（1–100）。
         """
         db = {
             "filterType": int(filter_type),
             "duration": duration,
-            "startBuffer": start_buffer
+            "startBuffer": start_buffer,
         }
         return self._send_command("CRI/StartControl", db)
 
-    def stop_realtime_control(self) -> CodroidResponse:
-        """
-        17.7 关闭实时控制模式 / Stop real-time control mode.
-        """
+    def stop_cri_control(self) -> CommonResponse:
+        """17.7 关闭实时控制 / Stop CRI control（C# ``StopCriControl``）。"""
         return self._send_command("CRI/StopControl", "")
+
+    def connect_remote_and_switch_on(self) -> CommonResponse:
+        """
+        与 C# ``ConnectRemoteAndSwitchOn`` 一致：``EnterRemoteModeViaAuto`` → ``SwitchOn``。
+        须先 ``connect()`` / ``with`` 已建立 TCP。
+        """
+        self.enter_remote_mode_via_auto()
+        return self.switch_on()
+
+    # --- 历史别名（旧示例/脚本兼容；新代码请用 C# 对齐名）---
+    get_statues = get_cri_data
+    save_global_variables = save_global_vars
+    remove_global_variables = remove_global_vars
+    forward_kinematics = apos_to_cpos
+    inverse_kinematics = cpos_to_apos
+    jog = start_jog
+    pause_move = pause_robot_motion
+    resume_move = resume_robot_motion
+    stop_move = stop_robot_move
+    clear_error = clear_system_error
+    start_data_push = start_cri_data_push
+    stop_data_push = stop_cri_data_push
+    start_realtime_control = start_cri_control
+    stop_realtime_control = stop_cri_control
+    run = run_project
+    run_by_index = run_project_by_index
+    get_register_value = get_register
+    apos_to_cpos_pose = apos_to_cpos
+    cpos_to_apos_joints = cpos_to_apos
+    calculate_relative_pose_result = calculate_relative_pose
 
     # --- 19. 机器人设置相关接口 / Robot Settings ---
 
-    def set_collision_sensitivity(self, sensitivity: int) -> CodroidResponse:
+    def set_collision_sensitivity(self, sensitivity: int) -> CommonResponse:
         """
         19.1 设置碰撞检测灵敏度 / Set collision detection sensitivity.
         仅 2.3.2.10 以上版本可用 / Only available in version 2.3.2.10+.
@@ -1122,7 +1202,7 @@ class CodroidControlInterface:
             sensitivity (int): 灵敏度 (0-100)，数值越大越灵敏 / Sensitivity value (0-100).
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         if not (0 <= sensitivity <= 100):
             from .exceptions import CodroidError
@@ -1130,7 +1210,7 @@ class CodroidControlInterface:
             
         return self._send_command("Robot/setCollisionSensitivity", sensitivity)
 
-    def set_payload(self, payload_id: int) -> CodroidResponse:
+    def set_payload(self, payload_id: int) -> CommonResponse:
         """
         19.2 设置负载 / Set robot payload.
         仅 2.3.2.10 以上版本可用 / Only available in version 2.3.2.10+.
@@ -1139,7 +1219,7 @@ class CodroidControlInterface:
             payload_id (int): 负载 ID (0-15) / Payload ID (0-15).
 
         Returns:
-            CodroidResponse: 响应对象 / Response object.
+            CommonResponse: 响应对象 / Response object.
         """
         if not (0 <= payload_id <= 15):
             from .exceptions import CodroidError
@@ -1154,3 +1234,6 @@ class CodroidControlInterface:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
+
+
+CodroidControlInterface = CodroidSession

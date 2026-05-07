@@ -1,4 +1,4 @@
-# src/codroid/models.py
+# src/codroid/define.py — DTO / 常量（对齐 C# Define.cs）
 from __future__ import annotations
 import json
 from dataclasses import dataclass, field
@@ -11,16 +11,11 @@ from typing import Any, Dict, List, Optional, Sequence, Union
 # =============================================================================
 
 @dataclass
-class CodroidResponse:
+class CommonResponse:
     """
-    SDK 通用响应对象 / Universal SDK Response Object.
+    TCP JSON 通用响应（C# ``CommonResponse`` / Define.cs）。
+    """
 
-    Attributes:
-        id (Union[int, str]): 请求的唯一标识 ID / Unique request ID.
-        ty (str): 接口类型名称 / Interface type name.
-        db (Optional[Any]): 接口返回的具体数据内容 / Data returned by the interface.
-        err (Optional[Any]): 错误信息。若为 None 则表示操作成功 / Error message, None if successful.
-    """
     id: Union[int, str]
     ty: str
     db: Optional[Any] = None
@@ -28,9 +23,6 @@ class CodroidResponse:
 
     @property
     def is_success(self) -> bool:
-        """
-        判断请求是否成功 / Check if the request was successful.
-        """
         return self.err is None
 
 
@@ -226,9 +218,9 @@ class MoveTarget:
 # 5. CRI 实时接口模型 / CRI Real-time Models
 # =============================================================================
 
-class CRIMask(IntFlag):
+class CriMask(IntFlag):
     """
-    CRI 推送掩码 (位操作) / CRI Push Mask (Bitmask).
+    CRI 推送位掩码（与 C# CRI mask 语义一致）。
     """
     TIMESTAMP = 1 << 0
     STATUS_1 = 1 << 1
@@ -243,8 +235,8 @@ class CRIMask(IntFlag):
     EXTRA_AXIS_POS = 1 << 15
 
 
-class CRIFilterType(IntEnum):
-    """CRI 实时控制滤波类型 / CRI Filter Type."""
+class CriFilterType(IntEnum):
+    """CRI 实时控制滤波类型（C# 同名枚举语义）。"""
     NONE = 0
     AVERAGE = 1
     LOW_PASS = 2
@@ -252,11 +244,13 @@ class CRIFilterType(IntEnum):
 
 
 @dataclass
-class CRIStatus:
+class CriStatus:
     """
-    详细的机器人系统状态解析结果 / Detailed Robot System Status.
+    CRI 状态位解析（C# 侧 status 结构；原始字见 ``status1_raw`` / ``status2_raw``）。
     """
-    # 状态数据 1 - 系统标志
+
+    status1_raw: int = 0
+    status2_raw: int = 0
     project_running: bool = False
     project_stopped: bool = False
     project_paused: bool = False
@@ -274,18 +268,30 @@ class CRIStatus:
     is_auto: bool = False
     is_remote: bool = False
 
-    # 状态数据 2 - 实时控制相关
     rt_control_mode: bool = False
     error_code: int = 0
 
+    @property
+    def real_time_control_mode(self) -> bool:
+        """C# ``RealTimeControlMode`` 位语义（同 ``rt_control_mode``）。"""
+        return self.rt_control_mode
+
+    @property
+    def cri_error_code(self) -> int:
+        """C# ``CriErrorCode``（高 8 位解析，同 ``error_code``）。"""
+        return self.error_code
+
 
 @dataclass
-class CRIData:
+class CriRealTimeData:
     """
-    CRI 完整实时数据包 / CRI Full Real-time Data Packet.
+    CRI 解析后实时数据（C# ``CriRealTimeData``，毫米 + 度；与 AGENTS.md §2.3.4 对齐）。
+
+    存储字段沿用历史 Python 名；文档属性（``TimestampMs`` 等）通过只读 property 暴露。
     """
+
     timestamp: int = 0
-    status: CRIStatus = field(default_factory=CRIStatus)
+    status: CriStatus = field(default_factory=CriStatus)
     joint_pos: List[float] = field(default_factory=list)
     joint_vel: List[float] = field(default_factory=list)
     cartesian_pos: List[float] = field(default_factory=list)
@@ -294,6 +300,50 @@ class CRIData:
     joint_torque: List[float] = field(default_factory=list)
     external_torque: List[float] = field(default_factory=list)
     extra_axis_pos: List[float] = field(default_factory=list)
+
+    @property
+    def timestamp_ms(self) -> int:
+        return self.timestamp
+
+    @property
+    def joint_position(self) -> List[float]:
+        return self.joint_pos
+
+    @property
+    def joint_velocity(self) -> List[float]:
+        return self.joint_vel
+
+    @property
+    def tcp_pose(self) -> List[float]:
+        return self.cartesian_pos
+
+    @property
+    def tcp_velocity(self) -> List[float]:
+        return self.cartesian_vel
+
+    @property
+    def tcp_linear_velocity(self) -> float:
+        return self.tcp_speed
+
+    @property
+    def joint_output_torque(self) -> List[float]:
+        return self.joint_torque
+
+    @property
+    def joint_external_force(self) -> List[float]:
+        return self.external_torque
+
+    @property
+    def external_axis_position(self) -> List[float]:
+        return self.extra_axis_pos
+
+
+# --- 历史别名（旧代码/示例）；新代码请用 CommonResponse / CriRealTimeData / Cri* ---
+CodroidResponse = CommonResponse
+CRIStatus = CriStatus
+CRIData = CriRealTimeData
+CRIMask = CriMask
+CRIFilterType = CriFilterType
 
 
 class MotionPath:
