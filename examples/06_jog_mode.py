@@ -1,12 +1,24 @@
 #!/usr/bin/env python3
 """
-点动：设置倍率、关节点动、后台 jog 心跳、停止。
+示例 06 — 点动（Jog）与心跳线程
 
-用法:
-  PYTHONPATH=src python examples/06_jog_mode.py
-  PYTHONPATH=src python examples/06_jog_mode.py --robot 192.168.8.136
+【目的】
+  演示手动点动：设置倍率 → 启动关节点动 → 周期 jogHeartbeat → stopJog。
 
-彩色横幅（可选）: pip install codroid-robot-sdk[color] 或 pip install colorama
+【前置条件】
+  - 已使能、手动/远程模式允许点动
+  - 点动期间必须持续发心跳，否则控制器会超时停止
+
+【涉及协议】
+  - Robot/setManualMoveRate、Robot/jog、Robot/jogHeartbeat、Robot/stopJog
+
+【运行】
+  PYTHONPATH=src python examples/06_jog_mode.py --robot <IP>
+
+【注意】
+  - speed 为 -1.0~1.0 的比例，负值表示反向
+  - index 为关节索引（示例为关节 1）
+  - 心跳间隔建议 ≤500ms，本示例约 400ms
 """
 from __future__ import annotations
 
@@ -15,15 +27,21 @@ import sys
 import threading
 import time
 
-from codroid import CodroidControlInterface, JogMode, PrintBanner
+from codroid import CodroidControlInterface, InitConsoleUtf8, JogMode, PrintBanner
 
 
-def start_heartbeat(robot: CodroidControlInterface, stop_event: threading.Event, interval: float = 0.4) -> None:
+def start_heartbeat(
+    robot: CodroidControlInterface,
+    stop_event: threading.Event,
+    interval: float = 0.4,
+) -> None:
+    """后台线程：在点动保持期间周期调用 jog_heartbeat。"""
     while not stop_event.is_set():
         try:
             robot.jog_heartbeat()
             time.sleep(interval)
         except Exception:
+            # 连接断开或已 stop 时退出线程
             break
 
 
@@ -39,6 +57,7 @@ def main(argv: list[str]) -> int:
         with CodroidControlInterface(host=args.robot) as robot:
             robot.enter_remote_mode_via_auto()
             robot.switch_on()
+            # 手动模式运动倍率 1~100（百分比）
             robot.set_manual_move_rate(50)
 
             stop_heartbeat = threading.Event()
@@ -49,6 +68,7 @@ def main(argv: list[str]) -> int:
             )
 
             print("关节 1 点动（示例速度）/ Jog joint 1...")
+            # JogMode.JOINT + index + speed（比例）
             robot.start_jog(mode=JogMode.JOINT, index=1, speed=-0.5)
             heartbeat_thread.start()
             time.sleep(args.duration)
@@ -63,4 +83,5 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
+    InitConsoleUtf8()
     raise SystemExit(main(sys.argv[1:]))

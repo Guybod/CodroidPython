@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "codroid-robot-sdk"
 dynamic = ["version"]
-description = ''
+description = 'Codroid robot controller Python SDK (TCP/CRI, typed motion API)'
 readme = "README.md"
 requires-python = ">=3.7"
 license = "MIT"

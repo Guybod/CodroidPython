@@ -174,6 +174,65 @@ class MoveToType(IntEnum):
 
 
 @dataclass
+class JointPoint:
+    """
+    关节目标（度）。业务层用于声明「这是六轴关节角」，避免与 TCP 位姿混淆。
+    """
+
+    jp: List[float]
+
+    @classmethod
+    def Degrees(cls, joints_deg: Sequence[float]) -> JointPoint:
+        """由六轴关节角（度）构造。"""
+        return cls(jp=[float(x) for x in joints_deg])
+
+
+@dataclass
+class CartesianPoint:
+    """
+    笛卡尔目标（mm + 度）。``cp`` 必填；``rj`` 可选（打包时缺省为控制器默认参考关节）。
+    """
+
+    cp: List[float]
+    rj: Optional[List[float]] = None
+
+    @classmethod
+    def MmDeg(cls, pose_mm_deg: Sequence[float]) -> CartesianPoint:
+        """TCP 位姿 [x,y,z,rx,ry,rz]（mm + 度），无参考关节。"""
+        return cls(cp=[float(x) for x in pose_mm_deg])
+
+    @classmethod
+    def MmDegWithRef(
+        cls,
+        pose_mm_deg: Sequence[float],
+        ref_joints_deg: Sequence[float],
+    ) -> CartesianPoint:
+        """TCP 位姿 + 逆解参考关节（度）；movJ/movL 到 TCP 且在意姿态解时推荐。"""
+        return cls(
+            cp=[float(x) for x in pose_mm_deg],
+            rj=[float(x) for x in ref_joints_deg],
+        )
+
+
+def _target_to_move_point(target: Union[JointPoint, CartesianPoint]) -> MovePoint:
+    if isinstance(target, JointPoint):
+        return MovePoint.FromJoint(target)
+    if isinstance(target, CartesianPoint):
+        return MovePoint.FromCartesian(target)
+    raise TypeError(
+        f"expected JointPoint or CartesianPoint, got {type(target).__name__}"
+    )
+
+
+def _resolve_move_point(
+    point: Union[MovePoint, JointPoint, CartesianPoint],
+) -> MovePoint:
+    if isinstance(point, MovePoint):
+        return point
+    return _target_to_move_point(point)
+
+
+@dataclass
 class MovePoint:
     """
     通用运动点位定义 / General Motion Point Definition.
@@ -189,30 +248,195 @@ class MovePoint:
     rj: Optional[Sequence[float]] = None
     ep: Optional[Sequence[float]] = None
 
+    @classmethod
+    def FromJoint(cls, joint: JointPoint) -> MovePoint:
+        """由 ``JointPoint`` 构造协议路点（仅 ``jp``）。"""
+        return cls(jp=list(joint.jp))
+
+    @classmethod
+    def FromCartesian(cls, cart: CartesianPoint) -> MovePoint:
+        """由 ``CartesianPoint`` 构造协议路点（``cp`` / 可选 ``rj``）。"""
+        return cls(
+            cp=list(cart.cp),
+            rj=list(cart.rj) if cart.rj is not None else None,
+        )
+
     def to_dict(self) -> Dict[str, Any]:
-        """过滤空字段，防止后端崩溃 / Filter None to prevent server crash."""
-        d = {}
-        if self.jp is not None: d["jp"] = list(self.jp)
-        if self.cp is not None: d["cp"] = list(self.cp)
-        if self.rj is not None: d["rj"] = list(self.rj)
-        if self.ep is not None: d["ep"] = list(self.ep)
-        return d
+        """
+        序列化为 ``Robot/move`` 路点字典（经 ``pack_move_point``，与 C++ 一致）。
+
+        须满足 jp 优先、笛卡尔缺省 rj 等规则；勿绕过本方法手写 targetPoint 字段。
+        """
+        from .robot_motion import pack_move_point
+
+        return pack_move_point(self)
+
+
+@dataclass
+class MoveInstruction:
+    """
+    单段 ``Robot/move`` 指令（C# ``MoveInstruction`` / C++ ``ClientMoveInstruction``）。
+
+    请用类方法 ``MovJ`` / ``MovL`` / ``MovC`` / ``MovCircle`` 构建，勿手写 ``type`` + 裸 ``MovePoint``。
+    """
+
+    motion_type: MotionType
+    target: MovePoint
+    speed: float
+    acc: float
+    blend: float = 0.0
+    relative_blend: int = 0
+    middle: Optional[MovePoint] = None
+    circle_num: Optional[int] = None
+    coor: Optional[Sequence[float]] = None
+    tool: Optional[Sequence[float]] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        from .robot_motion import pack_instruction
+
+        return pack_instruction(
+            self.motion_type,
+            self.target,
+            self.speed,
+            self.acc,
+            blend=self.blend,
+            relative_blend=self.relative_blend,
+            middle=self.middle,
+            circle_num=self.circle_num,
+            coor=self.coor,
+            tool=self.tool,
+        )
+
+    @classmethod
+    def MovJ(
+        cls,
+        target: Union[JointPoint, CartesianPoint],
+        speed: float,
+        acc: float,
+        blend: float = 0.0,
+        relative_blend: int = 0,
+        coor: Optional[Sequence[float]] = None,
+        tool: Optional[Sequence[float]] = None,
+    ) -> MoveInstruction:
+        """关节运动 movJ；目标可为关节或 TCP。"""
+        return cls(
+            MotionType.MOVJ,
+            _target_to_move_point(target),
+            speed,
+            acc,
+            blend=blend,
+            relative_blend=relative_blend,
+            coor=coor,
+            tool=tool,
+        )
+
+    @classmethod
+    def MovL(
+        cls,
+        target: Union[CartesianPoint, JointPoint],
+        speed: float,
+        acc: float,
+        blend: float = 0.0,
+        relative_blend: int = 0,
+        coor: Optional[Sequence[float]] = None,
+        tool: Optional[Sequence[float]] = None,
+    ) -> MoveInstruction:
+        """直线运动 movL；目标可为 TCP 或关节。"""
+        return cls(
+            MotionType.MOVL,
+            _target_to_move_point(target),
+            speed,
+            acc,
+            blend=blend,
+            relative_blend=relative_blend,
+            coor=coor,
+            tool=tool,
+        )
+
+    @classmethod
+    def MovC(
+        cls,
+        middle: CartesianPoint,
+        target: CartesianPoint,
+        speed: float,
+        acc: float,
+        blend: float = 0.0,
+        relative_blend: int = 0,
+        coor: Optional[Sequence[float]] = None,
+        tool: Optional[Sequence[float]] = None,
+    ) -> MoveInstruction:
+        """圆弧运动 movC（中间点与目标均为 TCP）。"""
+        return cls(
+            MotionType.MOVC,
+            MovePoint.FromCartesian(target),
+            speed,
+            acc,
+            blend=blend,
+            relative_blend=relative_blend,
+            middle=MovePoint.FromCartesian(middle),
+            coor=coor,
+            tool=tool,
+        )
+
+    @classmethod
+    def MovCircle(
+        cls,
+        middle: CartesianPoint,
+        target: CartesianPoint,
+        circle_num: int,
+        speed: float,
+        acc: float,
+        blend: float = 0.0,
+        relative_blend: int = 0,
+        coor: Optional[Sequence[float]] = None,
+        tool: Optional[Sequence[float]] = None,
+    ) -> MoveInstruction:
+        """整圆运动 movCircle。"""
+        return cls(
+            MotionType.MOVCIRCLE,
+            MovePoint.FromCartesian(target),
+            speed,
+            acc,
+            blend=blend,
+            relative_blend=relative_blend,
+            middle=MovePoint.FromCartesian(middle),
+            circle_num=circle_num,
+            coor=coor,
+            tool=tool,
+        )
 
 
 @dataclass
 class MoveTarget:
     """
-    MoveTo 专用目标结构 / MoveTo Target Structure.
+    MoveTo 专用目标结构（C# ``MoveToTarget`` / ``Robot/moveTo`` 的 target 字段）。
     """
+
     cp: Optional[Sequence[float]] = None
     jp: Optional[Sequence[float]] = None
     ep: Sequence[float] = field(default_factory=list)
 
+    @classmethod
+    def Joint(cls, joint: JointPoint) -> MoveTarget:
+        """关节目标（度）。"""
+        return cls(jp=list(joint.jp))
+
+    @classmethod
+    def Cartesian(cls, cart: CartesianPoint) -> MoveTarget:
+        """笛卡尔目标（mm + 度）；``moveTo`` 协议不使用 ``rj``。"""
+        return cls(cp=list(cart.cp))
+
     def to_dict(self) -> Dict[str, Any]:
         d: Dict[str, Any] = {"ep": list(self.ep)}
-        if self.cp is not None: d["cp"] = list(self.cp)
-        if self.jp is not None: d["jp"] = list(self.jp)
+        if self.cp is not None:
+            d["cp"] = list(self.cp)
+        if self.jp is not None:
+            d["jp"] = list(self.jp)
         return d
+
+
+# C# 命名别名
+MoveToTarget = MoveTarget
 
 # =============================================================================
 # 5. CRI 实时接口模型 / CRI Real-time Models
@@ -348,64 +572,98 @@ CRIFilterType = CriFilterType
 
 class MotionPath:
     """
-    运动路径构建器 / Motion Path Builder.
-    用于组合多个运动指令（movJ, movL, movC等）并一次性发送。
+    运动路径构建器（过渡 API；新代码优先 ``list[MoveInstruction]`` + ``Move()``）。
+
+    接受 ``MovePoint`` / ``JointPoint`` / ``CartesianPoint``，内部统一经 ``pack_instruction`` 打包。
     """
+
     def __init__(self):
         self._commands: List[Dict[str, Any]] = []
 
+    def add(self, instruction: MoveInstruction) -> MotionPath:
+        """追加由 ``MoveInstruction`` 工厂构建的一段指令。"""
+        self._commands.append(instruction.to_dict())
+        return self
+
     def _add_item(
-        self, 
+        self,
         m_type: MotionType,
-        target: MovePoint,
+        target: Union[MovePoint, JointPoint, CartesianPoint],
         speed: float,
         acc: float,
         blend: float = 0.0,
         relative_blend: int = 0,
-        middle: Optional[MovePoint] = None,
+        middle: Optional[Union[MovePoint, JointPoint, CartesianPoint]] = None,
         circle_num: Optional[int] = None,
         coor: Optional[Sequence[float]] = None,
-        tool: Optional[Sequence[float]] = None
+        tool: Optional[Sequence[float]] = None,
     ) -> MotionPath:
-        """核心构建逻辑，处理字段过滤防止后端崩溃"""
-        item: Dict[str, Any] = {
-            "type": m_type.value,
-            "speed": speed,
-            "acc": acc,
-            "blend": blend,
-            "relativeBlend": relative_blend,
-            "targetPoint": target.to_dict()
-        }
-        
-        if middle:
-            item["middlePoint"] = middle.to_dict()
-        if circle_num is not None:
-            item["circleNum"] = circle_num
-            
-        # ⚠️ 修复后端 Bug：如果 coor/tool 为空或 None，不发送该字段
-        if coor and len(coor) > 0:
-            item["coor"] = list(coor)
-        if tool and len(tool) > 0:
-            item["tool"] = list(tool)
-            
-        self._commands.append(item)
-        return self # 支持链式调用
+        from .robot_motion import pack_instruction
 
-    def mov_j(self, target: MovePoint, speed: float, acc: float, blend: float = 0.0) -> MotionPath:
-        """添加关节运动 / Add joint motion."""
+        resolved_middle = (
+            _resolve_move_point(middle) if middle is not None else None
+        )
+        item = pack_instruction(
+            m_type,
+            _resolve_move_point(target),
+            speed,
+            acc,
+            blend=blend,
+            relative_blend=relative_blend,
+            middle=resolved_middle,
+            circle_num=circle_num,
+            coor=coor,
+            tool=tool,
+        )
+        self._commands.append(item)
+        return self
+
+    def mov_j(
+        self,
+        target: Union[MovePoint, JointPoint, CartesianPoint],
+        speed: float,
+        acc: float,
+        blend: float = 0.0,
+    ) -> MotionPath:
+        """添加关节运动 movJ。"""
         return self._add_item(MotionType.MOVJ, target, speed, acc, blend)
 
-    def mov_l(self, target: MovePoint, speed: float, acc: float, blend: float = 0.0) -> MotionPath:
-        """添加直线运动 / Add linear motion."""
+    def mov_l(
+        self,
+        target: Union[MovePoint, JointPoint, CartesianPoint],
+        speed: float,
+        acc: float,
+        blend: float = 0.0,
+    ) -> MotionPath:
+        """添加直线运动 movL。"""
         return self._add_item(MotionType.MOVL, target, speed, acc, blend)
 
-    def mov_c(self, target_cp: Sequence[float], middle_cp: Sequence[float], speed: float, acc: float, blend: float = 0.0) -> MotionPath:
-        """添加圆弧运动 / Add circular arc motion."""
+    def mov_c(
+        self,
+        target: Union[CartesianPoint, Sequence[float]],
+        middle: Union[CartesianPoint, Sequence[float]],
+        speed: float,
+        acc: float,
+        blend: float = 0.0,
+    ) -> MotionPath:
+        """添加圆弧运动 movC（目标与中间点均为 TCP）。"""
+        target_mp = (
+            MovePoint.FromCartesian(target)
+            if isinstance(target, CartesianPoint)
+            else MovePoint(cp=list(target))
+        )
+        middle_mp = (
+            MovePoint.FromCartesian(middle)
+            if isinstance(middle, CartesianPoint)
+            else MovePoint(cp=list(middle))
+        )
         return self._add_item(
-            MotionType.MOVC, 
-            MovePoint(cp=list(target_cp)), 
-            speed, acc, blend, 
-            middle=MovePoint(cp=list(middle_cp))
+            MotionType.MOVC,
+            target_mp,
+            speed,
+            acc,
+            blend,
+            middle=middle_mp,
         )
 
     def clear(self):

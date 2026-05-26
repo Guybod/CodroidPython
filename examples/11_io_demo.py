@@ -1,19 +1,28 @@
 #!/usr/bin/env python3
 """
-数字量 / 模拟量：set_do、get_di、set_ao、get_ai、批量 get_io_values。
+示例 11 — 数字量 / 模拟量 IO
 
-用法:
-  PYTHONPATH=src python examples/11_io_demo.py
-  PYTHONPATH=src python examples/11_io_demo.py --robot 192.168.8.136
+【目的】
+  演示单点读写 DO/DI/AO/AI 及批量 ``get_io_values``。
 
-彩色横幅（可选）: pip install codroid-robot-sdk[color] 或 pip install colorama
+【前置条件】
+  - 远程模式；IO 端口号与硬件接线一致
+
+【涉及协议】
+  - IOManager/setDo、getDi、setAo、getAi、getIoValues（ty 见 PROTOCOL_LINE_BY_LINE.md）
+
+【运行】
+  PYTHONPATH=src python examples/11_io_demo.py --robot <IP>
+
+【注意】
+  - set_do(10, 1) 会改变输出，确认端口未驱动关键安全设备
 """
 from __future__ import annotations
 
 import argparse
 import sys
 
-from codroid import CodroidControlInterface, PrintBanner
+from codroid import CodroidControlInterface, InitConsoleUtf8, PrintBanner
 
 
 def main(argv: list[str]) -> int:
@@ -26,6 +35,7 @@ def main(argv: list[str]) -> int:
     try:
         with CodroidControlInterface(host=args.robot) as robot:
             robot.enter_remote_mode_via_auto()
+
             print("DO 10 = 1 / set_do(10, 1)")
             robot.set_do(10, 1)
 
@@ -38,6 +48,7 @@ def main(argv: list[str]) -> int:
             ai_val = robot.get_ai(1)
             print(f"AI 1 = {ai_val}")
 
+            # 批量读：每项为 {type, port}，type 为 DI/DO/AI/AO 字符串
             res = robot.get_io_values(
                 [
                     {"type": "DI", "port": 0},
@@ -51,4 +62,5 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
+    InitConsoleUtf8()
     raise SystemExit(main(sys.argv[1:]))

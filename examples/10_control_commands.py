@@ -1,12 +1,23 @@
 #!/usr/bin/env python3
 """
-控制类指令：清错、上使能、仿真、拖拽（示例时长）、下使能。
+示例 10 — 系统控制（清错 / 使能 / 仿真 / 拖拽）
 
-用法:
-  PYTHONPATH=src python examples/10_control_commands.py
-  PYTHONPATH=src python examples/10_control_commands.py --robot 192.168.8.136
+【目的】
+  演示与运动无关但常用的机器人状态切换 API。
 
-彩色横幅（可选）: pip install codroid-robot-sdk[color] 或 pip install colorama
+【前置条件】
+  - 远程模式；拖拽前通常需已使能
+
+【涉及协议】
+  - Robot/clearSystemError、switchOn、switchOff
+  - Robot/toSimulation、startDrag、stopDrag
+
+【运行】
+  PYTHONPATH=src python examples/10_control_commands.py --robot <IP>
+
+【注意】
+  - 仿真模式与真机行为不同，现场谨慎切换
+  - 拖拽结束后建议 stop_drag 再 switch_off
 """
 from __future__ import annotations
 
@@ -14,7 +25,7 @@ import argparse
 import sys
 import time
 
-from codroid import CodroidControlInterface, CodroidError, PrintBanner
+from codroid import CodroidControlInterface, CodroidError, InitConsoleUtf8, PrintBanner
 
 
 def main(argv: list[str]) -> int:
@@ -50,6 +61,7 @@ def main(argv: list[str]) -> int:
                 print("下使能 / switch_off")
                 robot.switch_off()
             except CodroidError as e:
+                # 控制器 err 字段映射为 CodroidError
                 print(f"CodroidError: {e}", file=sys.stderr)
                 return 1
     except KeyboardInterrupt:
@@ -58,4 +70,5 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
+    InitConsoleUtf8()
     raise SystemExit(main(sys.argv[1:]))

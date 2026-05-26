@@ -1,18 +1,25 @@
 #!/usr/bin/env python3
 """
-与 C# CodroidTest 对齐的聚合示例（子命令：global / kin / io / register / robotstatus / cri / motion / s20）。
+聚合联调脚本 — 对齐 C# ``CodroidTest/Program.cs``
 
-不传子命令或显式 ``all`` 时依次运行全部（耗时长，且会运动机器人）。
+【子命令】
+  global      全局变量读/写
+  kin         正逆解（aposToCpos / cposToApos）
+  io          读 DI0
+  register    寄存器三组读写（地址与数值见 AGENTS.md §5.1）
+  robotstatus 订阅 publish/RobotStatus
+  cri         CRI 收首帧烟测
+  motion      三段 movJ（关节）
+  s20         S20 movJ 三点 + movL 四点（需 CRI 快照作 MmDegWithRef）
 
-寄存器与 S20 运动常量见 AGENTS.md §5.1。
+【运行】
+  PYTHONPATH=src python examples/codroid_test.py              # 等同 all，依次全跑
+  PYTHONPATH=src python examples/codroid_test.py motion
+  PYTHONPATH=src python examples/codroid_test.py s20 --robot 192.168.8.136
 
-用法:
-  PYTHONPATH=src python examples/codroid_test.py
-  PYTHONPATH=src python examples/codroid_test.py all
-  PYTHONPATH=src python examples/codroid_test.py global --robot 192.168.8.136
-  PYTHONPATH=src python examples/codroid_test.py cri --local-ip 192.168.8.150
-
-彩色横幅（可选）: pip install codroid-robot-sdk[color] 或 pip install colorama
+【注意】
+  - ``all`` 会运动机器人且耗时 long，建议分项调试
+  - s20 / motion 使用 2.1+ ``JointPoint`` / ``CartesianPoint`` / ``MovJ`` / ``MovL``
 """
 from __future__ import annotations
 
@@ -21,14 +28,17 @@ import sys
 import time
 
 from codroid import (
+    CartesianPoint,
     CodroidClient,
     GlobalVariable,
-    MovePoint,
+    InitConsoleUtf8,
+    JointPoint,
     PrintBanner,
     PublishNotification,
     PublishTopics,
 )
 
+# 与 C# CodroidTest 子例顺序一致
 ALL_CMDS = (
     "global",
     "kin",
@@ -42,6 +52,7 @@ ALL_CMDS = (
 
 
 def cmd_global(robot_ip: str) -> None:
+    """globalVar：读全表 → 写入 sdk_demo_py → 再读验证。"""
     with CodroidClient(host=robot_ip) as robot:
         robot.enter_remote_mode_via_auto()
         res = robot.get_global_vars()
@@ -54,6 +65,7 @@ def cmd_global(robot_ip: str) -> None:
 
 
 def cmd_kin(robot_ip: str) -> None:
+    """运动学：关节角 → TCP；TCP+参考关节 → 关节角。"""
     with CodroidClient(host=robot_ip) as robot:
         robot.enter_remote_mode_via_auto()
         fk = robot.apos_to_cpos([0, 0, 90, 0, 90, 0])
@@ -66,6 +78,7 @@ def cmd_kin(robot_ip: str) -> None:
 
 
 def cmd_io(robot_ip: str) -> None:
+    """读数字输入 DI0。"""
     with CodroidClient(host=robot_ip) as robot:
         robot.enter_remote_mode_via_auto()
         try:
@@ -76,6 +89,7 @@ def cmd_io(robot_ip: str) -> None:
 
 
 def _register_group_a(robot: CodroidClient) -> None:
+    """§5.1 组 A：9032–9035 写 1 再清零。"""
     addrs = [9032, 9033, 9034, 9035]
     print("A read:", robot.get_register_values(addrs).db)
     for a in addrs:
@@ -87,6 +101,7 @@ def _register_group_a(robot: CodroidClient) -> None:
 
 
 def _register_group_b(robot: CodroidClient) -> None:
+    """§5.1 组 B：整型寄存器写 520。"""
     addrs = [49100, 49102, 49104]
     print("B read:", robot.get_register_values(addrs).db)
     for a in addrs:
@@ -98,6 +113,7 @@ def _register_group_b(robot: CodroidClient) -> None:
 
 
 def _register_group_c(robot: CodroidClient) -> None:
+    """§5.1 组 C：浮点寄存器写 520.52。"""
     addrs = [49300, 49302, 49304]
     print("C read:", robot.get_register_values(addrs).db)
     for a in addrs:
@@ -117,6 +133,7 @@ def cmd_register(robot_ip: str) -> None:
 
 
 def cmd_robotstatus(robot_ip: str) -> None:
+    """主题推送：首次订阅时向控制器发送 {ty, tc}。"""
     with CodroidClient(host=robot_ip) as robot:
         robot.enter_remote_mode_via_auto()
 
@@ -129,10 +146,11 @@ def cmd_robotstatus(robot_ip: str) -> None:
         try:
             time.sleep(3.0)
         finally:
-            sub.dispose()
+            sub.dispose()  # 本地退订；不向控制器发退订帧
 
 
 def cmd_cri(robot_ip: str, local_ip: str, local_port: int) -> None:
+    """CRI：启动推送，等待 timestamp>0 的首帧。"""
     with CodroidClient(host=robot_ip, local_ip=local_ip, udp_port=local_port) as robot:
         robot.enter_remote_mode_via_auto()
         robot.switch_on()
@@ -151,17 +169,22 @@ def cmd_cri(robot_ip: str, local_ip: str, local_port: int) -> None:
 
 
 def cmd_motion(robot_ip: str) -> None:
+    """§5.1 movJ 三段关节目标（度）。"""
     with CodroidClient(host=robot_ip) as robot:
         robot.enter_remote_mode_via_auto()
         robot.switch_on()
-        p1 = MovePoint(jp=[0, 0, 90, 0, 90, 0])
-        p2 = MovePoint(jp=[0, 0, 0, 0, 0, 0])
-        robot.move_j(p1, 40, 100, blend=25)
-        robot.move_j(p2, 40, 100, blend=25)
-        robot.move_j(p1, 40, 100, blend=25)
+        p1 = JointPoint.Degrees([0, 0, 90, 0, 90, 0])
+        p2 = JointPoint.Degrees([0, 0, 0, 0, 0, 0])
+        robot.MovJ(p1, 40, 100, blend=25)
+        robot.MovJ(p2, 40, 100, blend=25)
+        robot.MovJ(p1, 40, 100, blend=25)
 
 
 def cmd_s20(robot_ip: str, local_ip: str, local_port: int) -> None:
+    """
+    §5.1 S20 联调：movJ 三点 + movL 四点。
+    movL 每点前从 cri_cache 取关节作 MmDegWithRef，与 C# 同一时刻快照语义一致。
+    """
     jp_targets = [
         [0, 0, 90, 0, 90, 0],
         [0, 0, 0, 0, 0, 0],
@@ -181,14 +204,16 @@ def cmd_s20(robot_ip: str, local_ip: str, local_port: int) -> None:
         robot.start_cri_data_push(ip=local_ip, port=local_port)
 
         for jp in jp_targets:
-            robot.move_j(MovePoint(jp=jp), 40, 100, blend=25)
+            robot.MovJ(JointPoint.Degrees(jp), 40, 100, blend=25)
 
         for cp in cp_points:
             d = robot.cri_cache
             if not d or len(d.joint_pos) < 6:
-                raise RuntimeError("需要 CRI 关节快照作为 movL 的 rj / need CRI joint snapshot for rj")
+                raise RuntimeError(
+                    "需要 CRI 关节快照作为 movL 的 rj / need CRI joint snapshot for rj"
+                )
             rj = list(d.joint_pos)
-            robot.move_l(MovePoint(cp=cp, rj=rj), 150, 500, blend=25)
+            robot.MovL(CartesianPoint.MmDegWithRef(cp, rj), 150, 500, blend=25)
 
         robot.stop_cri_data_push(ip=local_ip, port=local_port)
 
@@ -257,4 +282,5 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
+    InitConsoleUtf8()
     raise SystemExit(main(sys.argv[1:]))

@@ -1,12 +1,23 @@
 #!/usr/bin/env python3
 """
-工程控制：运行、暂停、恢复、停止、按索引启动。
+示例 03 — 工程运行控制（运行 / 暂停 / 恢复 / 停止 / 按索引启动）
 
-用法:
-  PYTHONPATH=src python examples/03_run_project.py
-  PYTHONPATH=src python examples/03_run_project.py --robot 192.168.8.136
+【目的】
+  演示与示教器工程相关的 TCP 指令序列，便于集成 MES/上位机调度。
 
-彩色横幅（可选）: pip install codroid-robot-sdk[color] 或 pip install colorama
+【前置条件】
+  - 控制器内存在对应工程（--project-id 默认 projectluademo）
+  - 远程模式
+
+【涉及协议】
+  - project/run、pause、resume、stop、runByIndex 等（见 PROTOCOL_LINE_BY_LINE.md）
+
+【运行】
+  PYTHONPATH=src python examples/03_run_project.py --robot <IP>
+
+【注意】
+  - 每步之间有 --step-sleep 间隔，便于观察示教器状态
+  - 不传工程名时 run_project 可能失败，请按现场修改 --project-id
 """
 from __future__ import annotations
 
@@ -14,7 +25,7 @@ import argparse
 import sys
 import time
 
-from codroid import CodroidControlInterface, PrintBanner
+from codroid import CodroidControlInterface, InitConsoleUtf8, PrintBanner
 
 
 def main(argv: list[str]) -> int:
@@ -35,6 +46,7 @@ def main(argv: list[str]) -> int:
         with CodroidControlInterface(host=args.robot) as robot:
             robot.enter_remote_mode_via_auto()
 
+            # 按工程名启动
             res = robot.run_project(args.project_id)
             print("运行 / run:", "ok" if res.is_success else res.err)
             time.sleep(args.step_sleep)
@@ -51,6 +63,7 @@ def main(argv: list[str]) -> int:
             print("停止 / stop:", "ok" if res.is_success else res.err)
             time.sleep(args.step_sleep)
 
+            # 按索引启动（与示教器工程列表顺序相关）
             res = robot.run_project_by_index(args.index)
             print("按索引启动 / by_index:", "ok" if res.is_success else res.err)
             time.sleep(args.step_sleep)
@@ -63,4 +76,5 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
+    InitConsoleUtf8()
     raise SystemExit(main(sys.argv[1:]))

@@ -7,6 +7,7 @@ from typing import Any, Callable
 
 from .exceptions import CodroidCommandException
 from .define import (
+    CartesianPoint,
     CodroidRequest,
     CommonResponse,
     CodroidResponse,
@@ -18,11 +19,18 @@ from .define import (
     CRIData,
     CriStatus,
     CRIStatus,
+    JointPoint,
+    MoveInstruction,
+    MovePoint,
 )
 
 PublishHandler = Callable[[str, Any], None]
 
 __all__ = [
+    "JointPoint",
+    "CartesianPoint",
+    "MovePoint",
+    "MoveInstruction",
     "CodroidRequest",
     "CommonResponse",
     "CodroidResponse",

@@ -1,19 +1,29 @@
 #!/usr/bin/env python3
 """
-增量保存全局变量（整数、字符串、列表、字典）。
+示例 04 — 全局变量增量保存（globalVar/save）
 
-用法:
-  PYTHONPATH=src python examples/04_global_value.py
-  PYTHONPATH=src python examples/04_global_value.py --robot 192.168.8.136
+【目的】
+  演示 ``GlobalVariable`` 包装不同类型（int/str/list/dict）并批量写入控制器。
 
-彩色横幅（可选）: pip install codroid-robot-sdk[color] 或 pip install colorama
+【前置条件】
+  - 远程模式
+  - 变量名合法（字母数字下划线等，见 SDK 校验）
+
+【涉及协议】
+  - TCP globalVar/save：每个变量含 val（JSON 字符串）与可选 nm（备注）
+
+【运行】
+  PYTHONPATH=src python examples/04_global_value.py --robot <IP>
+
+【注意】
+  - save_global_vars 为增量保存，不会删除未出现在字典中的其它全局变量
 """
 from __future__ import annotations
 
 import argparse
 import sys
 
-from codroid import CodroidControlInterface, GlobalVariable, PrintBanner
+from codroid import CodroidControlInterface, GlobalVariable, InitConsoleUtf8, PrintBanner
 
 
 def main(argv: list[str]) -> int:
@@ -23,6 +33,7 @@ def main(argv: list[str]) -> int:
 
     PrintBanner("04 — Global variables", subtitle=args.robot)
 
+    # 键为控制器侧全局变量名；value 为 GlobalVariable(value=..., note=...)
     vars_to_save = {
         "v_int": GlobalVariable(value=1024, note="整数示例"),
         "v_str": GlobalVariable(value="Codroid", note="字符串示例"),
@@ -49,4 +60,5 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
+    InitConsoleUtf8()
     raise SystemExit(main(sys.argv[1:]))

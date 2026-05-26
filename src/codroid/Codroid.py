@@ -8,6 +8,7 @@ from __future__ import annotations
 import threading
 import socket
 import time
+import warnings
 from typing import Any, Dict, List, Literal, Optional, Union, Sequence, cast
 from .async_tcp_client import JsonStreamClient
 from .exceptions import CodroidError
@@ -583,30 +584,37 @@ class CodroidSession:
         """
         return self._send_command("Robot/jogHeartbeat", "")
 
-    def move_to(
-        self, 
-        move_type: MoveToType, 
-        target: Optional[MoveTarget] = None
+    def MoveTo(
+        self,
+        move_type: MoveToType,
+        target: Optional[MoveTarget] = None,
     ) -> CommonResponse:
         """
-        11.4 运动到指定位置 / Move to specified position.
-        注意：启动后需每隔 0.5s 调用 move_to_heartbeat() 维持运动。
+        11.4 运动到指定位置（C# ``MoveTo`` / ``Robot/moveTo``）。
 
-        Args:
-            move_type (MoveToType): 预设位置类型或规划类型.
-            target (Optional[MoveTarget]): 目标位置 (仅在类型为 JOINT 或 LINEAR 时需要).
+        关节/直线目标请用 ``MoveTarget.Joint`` / ``MoveTarget.Cartesian`` 构造。
+        启动后须每 0.5s 调用 ``MoveToHeartbeat()``。
         """
         db: Dict[str, Any] = {"type": int(move_type)}
         if target is not None:
             db["target"] = target.to_dict()
-            
         return self._send_command("Robot/moveTo", db)
 
-    def move_to_heartbeat(self) -> CommonResponse:
-        """
-        11.5 moveTo 心跳 / MoveTo heartbeat.
-        """
+    def move_to(
+        self,
+        move_type: MoveToType,
+        target: Optional[MoveTarget] = None,
+    ) -> CommonResponse:
+        """兼容别名，请改用 ``MoveTo``。"""
+        return self.MoveTo(move_type, target)
+
+    def MoveToHeartbeat(self) -> CommonResponse:
+        """11.5 moveTo 心跳（C# ``MoveToHeartbeat``）。"""
         return self._send_command("Robot/moveToHeartbeat")
+
+    def move_to_heartbeat(self) -> CommonResponse:
+        """兼容别名，请改用 ``MoveToHeartbeat``。"""
+        return self.MoveToHeartbeat()
 
     def set_manual_move_rate(self, rate: int) -> CommonResponse:
         """
@@ -634,136 +642,260 @@ class CodroidSession:
         """内部：发送 ``Robot/move`` 指令列表。"""
         return self._send_command("Robot/move", commands)
 
-    def move(self, commands: Union[MotionPath, List[Dict[str, Any]]]) -> CommonResponse:
+    def _motion_instruction_item(
+        self,
+        instruction: MoveInstruction,
+    ) -> Dict[str, Any]:
+        return instruction.to_dict()
+
+    def Move(
+        self,
+        path: Union[
+            MotionPath,
+            List[MoveInstruction],
+            List[Dict[str, Any]],
+        ],
+    ) -> CommonResponse:
         """
         11.8 运动指令列表（C# ``Move`` / ``Robot/move``）。
 
-        可传入 ``MotionPath``（与 ``execute_path`` 等价）或已序列化的指令 dict 列表
-        （与 ``MotionPath.get_commands()`` 形态一致）。
+        推荐 ``List[MoveInstruction]``（``MoveInstruction.MovJ`` / ``MovL`` 等工厂构建）。
+        亦兼容 ``MotionPath`` 与已序列化的 dict 列表。
         """
-        if isinstance(commands, MotionPath):
-            cmds = commands.get_commands()
-            if not cmds:
-                raise CodroidError("路径不能为空 / Path cannot be empty")
-            return self._send_move_commands(cmds)
-        cmds = cast(List[Dict[str, Any]], commands)
+        if isinstance(path, MotionPath):
+            cmds = path.get_commands()
+        elif isinstance(path, list):
+            if path and isinstance(path[0], MoveInstruction):
+                cmds = [inst.to_dict() for inst in cast(List[MoveInstruction], path)]
+            else:
+                cmds = cast(List[Dict[str, Any]], path)
+        else:
+            raise CodroidError(
+                f"Move 需要 MotionPath 或 list，收到 {type(path).__name__}"
+            )
         if not cmds:
             raise CodroidError("运动指令列表不能为空 / Move command list cannot be empty")
         return self._send_move_commands(cmds)
 
-    def _build_move_item(
-        self, 
-        m_type: MotionType,
+    def move(
+        self,
+        path: Union[MotionPath, List[MoveInstruction], List[Dict[str, Any]]],
+    ) -> CommonResponse:
+        """兼容别名，请改用 ``Move``。"""
+        return self.Move(path)
+
+    def MovJ(
+        self,
+        target: Union[JointPoint, CartesianPoint, MovePoint],
+        speed: float,
+        acceleration: float,
+        blend: float = 0.0,
+        coor: Optional[Sequence[float]] = None,
+        tool: Optional[Sequence[float]] = None,
+    ) -> CommonResponse:
+        """
+        关节运动 movJ。目标为 ``JointPoint``（发 jp）或 ``CartesianPoint``（发 cp+rj）。
+        高级用法可传已构建的 ``MovePoint``。
+        """
+        if isinstance(target, MovePoint):
+            from .robot_motion import pack_instruction
+
+            item = pack_instruction(
+                MotionType.MOVJ,
+                target,
+                speed,
+                acceleration,
+                blend=blend,
+                coor=coor,
+                tool=tool,
+            )
+            return self._send_move_commands([item])
+        inst = MoveInstruction.MovJ(
+            target,
+            speed,
+            acceleration,
+            blend=blend,
+            coor=coor,
+            tool=tool,
+        )
+        return self._send_move_commands([self._motion_instruction_item(inst)])
+
+    def MovL(
+        self,
+        target: Union[CartesianPoint, JointPoint, MovePoint],
+        speed: float,
+        acceleration: float,
+        blend: float = 0.0,
+        coor: Optional[Sequence[float]] = None,
+        tool: Optional[Sequence[float]] = None,
+    ) -> CommonResponse:
+        """
+        直线运动 movL。目标为 ``CartesianPoint`` 或 ``JointPoint``。
+        """
+        if isinstance(target, MovePoint):
+            from .robot_motion import pack_instruction
+
+            item = pack_instruction(
+                MotionType.MOVL,
+                target,
+                speed,
+                acceleration,
+                blend=blend,
+                coor=coor,
+                tool=tool,
+            )
+            return self._send_move_commands([item])
+        inst = MoveInstruction.MovL(
+            target,
+            speed,
+            acceleration,
+            blend=blend,
+            coor=coor,
+            tool=tool,
+        )
+        return self._send_move_commands([self._motion_instruction_item(inst)])
+
+    def MovC(
+        self,
+        middle: CartesianPoint,
+        target: CartesianPoint,
+        speed: float,
+        acceleration: float,
+        blend: float = 0.0,
+        coor: Optional[Sequence[float]] = None,
+        tool: Optional[Sequence[float]] = None,
+    ) -> CommonResponse:
+        """圆弧运动 movC（中间点与目标均为 TCP）。"""
+        inst = MoveInstruction.MovC(
+            middle,
+            target,
+            speed,
+            acceleration,
+            blend=blend,
+            coor=coor,
+            tool=tool,
+        )
+        return self._send_move_commands([self._motion_instruction_item(inst)])
+
+    def MovCircle(
+        self,
+        middle: CartesianPoint,
+        target: CartesianPoint,
+        circle_num: int,
+        speed: float,
+        acceleration: float,
+        blend: float = 0.0,
+        coor: Optional[Sequence[float]] = None,
+        tool: Optional[Sequence[float]] = None,
+    ) -> CommonResponse:
+        """整圆运动 movCircle。"""
+        inst = MoveInstruction.MovCircle(
+            middle,
+            target,
+            circle_num,
+            speed,
+            acceleration,
+            blend=blend,
+            coor=coor,
+            tool=tool,
+        )
+        return self._send_move_commands([self._motion_instruction_item(inst)])
+
+    def move_j(
+        self,
         target: MovePoint,
         speed: float,
         acc: float,
         blend: float = 0.0,
-        relative_blend: int = 0,
-        middle: Optional[MovePoint] = None,
-        circle_num: Optional[int] = None,
         coor: Optional[Sequence[float]] = None,
-        tool: Optional[Sequence[float]] = None
-    ) -> Dict[str, Any]:
-        """构建单个运动指令字典，处理字段过滤逻辑"""
-        item: Dict[str, Any] = {
-            "type": m_type.value,
-            "speed": speed,
-            "acc": acc,
-            "blend": blend,
-            "relativeBlend": relative_blend,
-            "targetPoint": target.to_dict()
-        }
-        
-        if middle:
-            item["middlePoint"] = middle.to_dict()
-        if circle_num is not None:
-            item["circleNum"] = circle_num
-            
-        # ⚠️ 关键 Bug 修复：仅当 coor/tool 有值时才发送字段
-        if coor:
-            item["coor"] = coor
-        if tool:
-            item["tool"] = tool
-            
-        return item
-
-    # --- 11.8 拆分后的运动指令 ---
-
-    def move_j(
-        self, 
-        target: MovePoint, 
-        speed: float, 
-        acc: float, 
-        blend: float = 0.0,
-        coor: Optional[Sequence[float]] = None,
-        tool: Optional[Sequence[float]] = None
+        tool: Optional[Sequence[float]] = None,
     ) -> CommonResponse:
-        """
-        关节运动 (movJ)。
-        """
-        item = self._build_move_item(MotionType.MOVJ, target, speed, acc, blend, coor=coor, tool=tool)
-        return self._send_move_commands([item])
+        """已废弃：请改用 ``MovJ(JointPoint.Degrees(...))`` 或 ``MovJ(CartesianPoint.MmDeg(...))``。"""
+        warnings.warn(
+            "move_j(MovePoint, ...) is deprecated; use MovJ(JointPoint|CartesianPoint, ...)",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.MovJ(target, speed, acc, blend=blend, coor=coor, tool=tool)
 
     def move_l(
-        self, 
-        target: MovePoint, 
-        speed: float, 
-        acc: float, 
+        self,
+        target: MovePoint,
+        speed: float,
+        acc: float,
         blend: float = 0.0,
         coor: Optional[Sequence[float]] = None,
-        tool: Optional[Sequence[float]] = None
+        tool: Optional[Sequence[float]] = None,
     ) -> CommonResponse:
-        """
-        直线运动 (movL)。
-        """
-        item = self._build_move_item(MotionType.MOVL, target, speed, acc, blend, coor=coor, tool=tool)
-        return self._send_move_commands([item])
+        """已废弃：请改用 ``MovL(CartesianPoint|JointPoint, ...)``。"""
+        warnings.warn(
+            "move_l(MovePoint, ...) is deprecated; use MovL(CartesianPoint|JointPoint, ...)",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.MovL(target, speed, acc, blend=blend, coor=coor, tool=tool)
 
     def move_c(
-        self, 
-        target_cp: Sequence[float], 
-        middle_cp: Sequence[float], 
-        speed: float, 
-        acc: float, 
+        self,
+        target_cp: Sequence[float],
+        middle_cp: Sequence[float],
+        speed: float,
+        acc: float,
         blend: float = 0.0,
         coor: Optional[Sequence[float]] = None,
-        tool: Optional[Sequence[float]] = None
+        tool: Optional[Sequence[float]] = None,
     ) -> CommonResponse:
-        """
-        圆弧运动 (movC)。
-        注意：必须传入笛卡尔坐标点 (cp)。
-        """
-        target = MovePoint(cp=target_cp)
-        middle = MovePoint(cp=middle_cp)
-        item = self._build_move_item(MotionType.MOVC, target, speed, acc, blend, middle=middle, coor=coor, tool=tool)
-        return self._send_move_commands([item])
+        """已废弃：请改用 ``MovC(CartesianPoint, CartesianPoint, ...)``。"""
+        warnings.warn(
+            "move_c is deprecated; use MovC with CartesianPoint.MmDeg(...)",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.MovC(
+            CartesianPoint.MmDeg(middle_cp),
+            CartesianPoint.MmDeg(target_cp),
+            speed,
+            acc,
+            blend=blend,
+            coor=coor,
+            tool=tool,
+        )
 
     def move_circle(
-        self, 
-        target_cp: Sequence[float], 
-        middle_cp: Sequence[float], 
-        speed: float, 
-        acc: float, 
+        self,
+        target_cp: Sequence[float],
+        middle_cp: Sequence[float],
+        speed: float,
+        acc: float,
         circle_num: int = 1,
         coor: Optional[Sequence[float]] = None,
-        tool: Optional[Sequence[float]] = None
+        tool: Optional[Sequence[float]] = None,
     ) -> CommonResponse:
-        """
-        圆周运动 (movCircle)。
-        """
-        target = MovePoint(cp=target_cp)
-        middle = MovePoint(cp=middle_cp)
-        item = self._build_move_item(
-            MotionType.MOVCIRCLE, target, speed, acc, 
-            middle=middle, circle_num=circle_num, coor=coor, tool=tool
+        """已废弃：请改用 ``MovCircle``。"""
+        warnings.warn(
+            "move_circle is deprecated; use MovCircle with CartesianPoint.MmDeg(...)",
+            DeprecationWarning,
+            stacklevel=2,
         )
-        return self._send_move_commands([item])
+        return self.MovCircle(
+            CartesianPoint.MmDeg(middle_cp),
+            CartesianPoint.MmDeg(target_cp),
+            circle_num,
+            speed,
+            acc,
+            blend=blend,
+            coor=coor,
+            tool=tool,
+        )
 
     def execute_path(self, path: MotionPath) -> CommonResponse:
-        """
-        11.8 执行运动路径 / Execute a motion path（内部即 ``move(path)``）。
-        """
-        return self.move(path)
+        """已废弃：请改用 ``Move(path)``。"""
+        warnings.warn(
+            "execute_path is deprecated; use Move(path)",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.Move(path)
 
     # --- 11.9 - 11.11 运动控制 ---
 

@@ -1,19 +1,30 @@
 #!/usr/bin/env python3
 """
-RS485：初始化、清空、写入、按长度超时读取（示例 Modbus 帧）。
+示例 05 — 末端 RS485（初始化 / 清空 / 写 / 按长度读）
 
-用法:
-  PYTHONPATH=src python examples/05_rs485.py
-  PYTHONPATH=src python examples/05_rs485.py --robot 192.168.8.136
+【目的】
+  演示通过 TCP 转发的末端 485 收发，示例帧为 Modbus 读保持寄存器（仅作格式参考）。
 
-彩色横幅（可选）: pip install codroid-robot-sdk[color] 或 pip install colorama
+【前置条件】
+  - 末端 485 硬件与从站已连接
+  - 波特率与从站一致（示例 115200 8N1）
+
+【涉及协议】
+  - TCP Robot/rs485Init、rs485Flush、rs485Write、rs485Read
+
+【运行】
+  PYTHONPATH=src python examples/05_rs485.py --robot <IP>
+
+【注意】
+  - timeout 单位为毫秒（示例 1000）
+  - 无响应时 read 可能失败或 db 为空，属正常现象
 """
 from __future__ import annotations
 
 import argparse
 import sys
 
-from codroid import CodroidControlInterface, RS485BaudRate, PrintBanner
+from codroid import CodroidControlInterface, InitConsoleUtf8, RS485BaudRate, PrintBanner
 
 
 def main(argv: list[str]) -> int:
@@ -26,10 +37,13 @@ def main(argv: list[str]) -> int:
     try:
         with CodroidControlInterface(host=args.robot) as robot:
             robot.enter_remote_mode_via_auto()
+
+            # 配置末端 485 参数（枚举与 C# RS485BaudRate 对齐）
             print("初始化 115200 N 8 1 / RS485 init")
             robot.rs485_init(baudrate=RS485BaudRate.B115200)
             robot.rs485_flush()
 
+            # 示例 Modbus RTU：站号 1，功能码 03，读 2 个寄存器（CRC 已含在帧内）
             cmd = b"\x01\x03\x00\x00\x00\x02\xC4\x0B"
             print(f"发送 / TX: {cmd.hex()}")
             robot.rs485_write(cmd)
@@ -47,4 +61,5 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
+    InitConsoleUtf8()
     raise SystemExit(main(sys.argv[1:]))

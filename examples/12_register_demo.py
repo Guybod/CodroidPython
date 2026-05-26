@@ -1,19 +1,29 @@
 #!/usr/bin/env python3
 """
-寄存器与扩展数组：读写寄存器、配置扩展数组类型、删除扩展数组项。
+示例 12 — 寄存器与扩展数组
 
-用法:
-  PYTHONPATH=src python examples/12_register_demo.py
-  PYTHONPATH=src python examples/12_register_demo.py --robot 192.168.8.136
+【目的】
+  演示单个寄存器读写、扩展数组类型声明与删除。
 
-彩色横幅（可选）: pip install codroid-robot-sdk[color] 或 pip install colorama
+【前置条件】
+  - 远程模式；地址与控制器内存映射一致（浮点示例 49300）
+
+【涉及协议】
+  - RegisterManager/setRegisterValue、getRegister
+  - setExtendArrayType、removeExtendArray
+
+【运行】
+  PYTHONPATH=src python examples/12_register_demo.py --robot <IP>
+
+【注意】
+  - 批量联调常量见 AGENTS.md §5.1 与 ``codroid_test.py register`` 子命令
 """
 from __future__ import annotations
 
 import argparse
 import sys
 
-from codroid import CodroidControlInterface, ExtendArrayType, PrintBanner
+from codroid import CodroidControlInterface, ExtendArrayType, InitConsoleUtf8, PrintBanner
 
 
 def main(argv: list[str]) -> int:
@@ -26,11 +36,14 @@ def main(argv: list[str]) -> int:
     try:
         with CodroidControlInterface(host=args.robot) as robot:
             robot.enter_remote_mode_via_auto()
+
+            # 浮点寄存器写读（地址因机型/配置而异）
             print("寄存器 49300 = 123.45 / set_register_value")
             robot.set_register_value(49300, 123.45)
             val = robot.get_register(49300)
             print(f"读回 / read: {val}")
 
+            # 将逻辑扩展数组 ID 绑定为 Float32 元素类型
             print("扩展数组 999 → Float32 / set_extend_array_type")
             robot.set_extend_array_type(999, ExtendArrayType.FLOAT32)
 
@@ -42,4 +55,5 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
+    InitConsoleUtf8()
     raise SystemExit(main(sys.argv[1:]))

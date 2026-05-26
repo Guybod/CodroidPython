@@ -27,6 +27,7 @@ from .trajectory import (
 )
 from .cri_realtime_dispatcher import CriRealtimeDispatcher
 from .console import PrintBanner
+from .console_utf8 import InitConsoleUtf8, init_console_utf8
 
 __all__ = [
     "__version__",
@@ -55,6 +56,11 @@ __all__ = [
     "JogCoorType",
     "MoveToType",
     "MoveTarget",
+    "MoveToTarget",
+    "JointPoint",
+    "CartesianPoint",
+    "MovePoint",
+    "MoveInstruction",
     "MotionPath",
     "IOType",
     "ExtendArrayType",
@@ -72,4 +78,6 @@ __all__ = [
     "TrajectoryPoint",
     "CriRealtimeDispatcher",
     "PrintBanner",
+    "InitConsoleUtf8",
+    "init_console_utf8",
 ]

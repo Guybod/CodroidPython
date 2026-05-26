@@ -1,14 +1,25 @@
 #!/usr/bin/env python3
 """
-CRI UDP 原始流：本机 ``CriStreamHandler`` 绑定端口，控制器 ``StartCriDataPush`` 后 recv 解析。
+示例 13 — CRI UDP 底层收包与解析（CriStreamHandler）
 
-数据布局与掩码须与控制器一致；固定 308 字节布局见 AGENTS.md §2.3。
+【目的】
+  不依赖 CodroidSession 内置 CRI 线程，直接绑定 UDP、收包、``parse_packet``。
+  便于理解 308 字节布局与掩码字段。
 
-用法:
-  PYTHONPATH=src python examples/13_cri_realtime.py
-  PYTHONPATH=src python examples/13_cri_realtime.py --robot 192.168.8.136 --local-ip 192.168.8.150
+【前置条件】
+  - TCP 可连；本机端口可 bind
+  - StartCriDataPush 的 mask/duration 与 handler 配置一致
 
-彩色横幅（可选）: pip install codroid-robot-sdk[color] 或 pip install colorama
+【数据格式】
+  - 固定 308 字节（六轴、mask=0xFFFF、高精度策略见 AGENTS.md §2.3）
+  - 解析后 joint_pos 等为 **mm + 度**（非线上 m/rad）
+
+【运行】
+  PYTHONPATH=src python examples/13_cri_realtime.py --robot <IP> --local-ip <IP>
+
+【注意】
+  - 示例直接访问 handler._sock，仅用于演示；生产环境可用公开 API 封装
+  - high_precision=False 时须与 start_cri_data_push 参数一致
 """
 from __future__ import annotations
 
@@ -20,6 +31,7 @@ from codroid import (
     CodroidControlInterface,
     CriMask,
     CriStreamHandler,
+    InitConsoleUtf8,
     PrintBanner,
 )
 
@@ -38,6 +50,7 @@ def main(argv: list[str]) -> int:
         subtitle=f"{args.robot} → {args.local_ip}:{args.local_port}",
     )
 
+    # 订阅字段掩码：决定 UDP 包内包含哪些段（与 push 请求 mask 一致）
     my_mask = CriMask.TIMESTAMP | CriMask.STATUS_1 | CriMask.JOINT_POS
     handler = CriStreamHandler(high_precision=False, mask=my_mask)
     try:
@@ -129,4 +142,5 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
+    InitConsoleUtf8()
     raise SystemExit(main(sys.argv[1:]))

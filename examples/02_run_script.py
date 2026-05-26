@@ -1,19 +1,30 @@
 #!/usr/bin/env python3
 """
-通过 ``project/runScript`` 下发 Lua 与共享变量。
+示例 02 — 远程 Lua 脚本（project/runScript）
 
-用法:
-  PYTHONPATH=src python examples/02_run_script.py
-  PYTHONPATH=src python examples/02_run_script.py --robot 192.168.8.136
+【目的】
+  向控制器下发一段 Lua 源码及可选全局变量字典，由控制器解释执行。
 
-彩色横幅（可选）: pip install codroid-robot-sdk[color] 或 pip install colorama
+【前置条件】
+  - 已进入远程模式（本示例调用 enter_remote_mode_via_auto）
+  - Lua 语法与控制器内置 API 匹配（如 movej 等）
+
+【涉及协议】
+  - TCP ``project/runScript``：db 含脚本文本与 vars
+
+【运行】
+  PYTHONPATH=src python examples/02_run_script.py --robot <IP>
+
+【注意】
+  - 示例脚本含 movej，会运动；请按现场修改 lua_code
+  - vars 键名须符合控制器变量命名规则
 """
 from __future__ import annotations
 
 import argparse
 import sys
 
-from codroid import CodroidControlInterface, PrintBanner
+from codroid import CodroidControlInterface, InitConsoleUtf8, PrintBanner
 
 
 def main(argv: list[str]) -> int:
@@ -23,7 +34,9 @@ def main(argv: list[str]) -> int:
 
     PrintBanner("02 — Run script", subtitle=args.robot)
 
+    # 下发到控制器的 Lua 源码（字符串）；换行用 \\n
     lua_code = "print('Hello Codroid')\nmovej([0,0,0,0,0,0])"
+    # 与脚本一起传入的共享变量（控制器侧可见）
     vars_data = {"v1": 100, "v2": "test"}
 
     try:
@@ -34,6 +47,7 @@ def main(argv: list[str]) -> int:
             if res.is_success:
                 print("脚本请求已发送 / Script request sent")
             else:
+                # res.err 非空表示控制器拒绝或执行报错
                 print(f"失败 / Failed: {res.err}", file=sys.stderr)
                 return 1
     except KeyboardInterrupt:
@@ -42,4 +56,5 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
+    InitConsoleUtf8()
     raise SystemExit(main(sys.argv[1:]))
