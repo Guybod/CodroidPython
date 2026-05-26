@@ -35,20 +35,20 @@ def main(argv: list[str]) -> int:
 
     try:
         with CodroidControlInterface(host=args.robot) as robot:
-            robot.enter_remote_mode_via_auto()
+            robot.EnterRemoteModeViaAuto()
 
             # 浮点寄存器写读（地址因机型/配置而异）
             print("寄存器 49300 = 123.45 / set_register_value")
-            robot.set_register_value(49300, 123.45)
-            val = robot.get_register(49300)
+            robot.SetRegisterValue(49300, 123.45)
+            val = robot.GetRegisterValue(49300)
             print(f"读回 / read: {val}")
 
             # 将逻辑扩展数组 ID 绑定为 Float32 元素类型
             print("扩展数组 999 → Float32 / set_extend_array_type")
-            robot.set_extend_array_type(999, ExtendArrayType.FLOAT32)
+            robot.SetExtendArrayType(999, ExtendArrayType.FLOAT32)
 
             print("重置扩展数组 999 / remove_extend_array")
-            robot.remove_extend_array(999)
+            robot.RemoveExtendArray(999)
     except KeyboardInterrupt:
         return 130
     return 0

@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.1.1 — 机器人设置 API（协议 19.x）
+
+### Added
+
+- `robot_settings.py`：`RobotFrame`、`RobotPayloadFrame`、`RobotParameters`
+- `SetCollisionSensitivity`、`GetRobotParameters`
+- 仅改默认编号：`SetDefaultPayloadId`、`SetDefaultToolId`、`SetDefaultUserCoordinateId`
+- 先读后改：`SetToolFrame`、`SetPayloadFrame`、`SetUserCoordinateFrame`
+- 整表下发：`SaveToolFrames`、`SavePayloadFrames`、`SaveUserCoordinateFrames`
+- 示例：`examples/14_robot_parameters.py`；`codroid_test.py robotparam`；`examples/08_move.py` 四组合 + MovC
+
+### Changed / Breaking
+
+- 运动门面仅保留 C# 同名：`MovJ`、`MovL`、`MovC`、`MovCircle`、`Move`、`MoveTo`、`MoveToHeartbeat`
+- 移除 `move_j` / `move_l` / `move_c` / `move_circle` / `execute_path` / `move` / `move_to` / `move_to_heartbeat`
+- `MoveTarget` 更名为 `MoveToTarget`（与 C# 一致）；`MotionPath.mov_*` 更名为 `MovJ` / `MovL` / `MovC`
+- **`CodroidSession` / `CodroidClient` 全部公开方法改为 PascalCase**（`Connect`、`SwitchOn`、`GetDi`、`StartCriDataPush` 等）；移除文件末尾历史 snake_case 别名
+- `get_cri_data()` 改为属性 **`CriData`**（对齐 C#）
+- `close` / `disconnect` 合并为 **`Disconnect`**
+- `CriRealtimeDispatcher.send_command` → **`SendCommand`**，`send_trajectory` → **`SendTrajectory`**
+- 移除 `subscribe_publish_topic` 别名
+
 ## 2.1.0 — 运动 API 类型化（Breaking）
 
 与 C++ SDK v2.1.1 / `update1.md` 对齐。
@@ -9,7 +31,7 @@
 - `JointPoint`、`CartesianPoint`、`MoveInstruction` 及工厂（`Degrees`、`MmDeg`、`MmDegWithRef`、`MovJ`/`MovL`/…）
 - `pack_move_point` / `pack_instruction`（`jp` 优先；笛卡尔缺省 `rj=[20,…,20]`）
 - 门面 API：`MovJ`、`MovL`、`MovC`、`MovCircle`、`Move`、`MoveTo`、`MoveToHeartbeat`
-- `MoveTarget.Joint` / `MoveTarget.Cartesian`（别名 `MoveToTarget`）
+- `MoveToTarget.Joint` / `MoveToTarget.Cartesian`
 - `InitConsoleUtf8()`（Windows 控制台 UTF-8）
 
 ### Changed
@@ -19,7 +41,7 @@
 
 ### Deprecated
 
-- `move_j` / `move_l` / `move_c` / `move_circle` / `execute_path`（请改用 PascalCase 门面）
+- 旧版 snake_case 运动方法（2.1.1 起已删除，见 2.1.1 Breaking）
 - 直接 `MovePoint(jp=…)` 作业务目标（请改用 `JointPoint` / `CartesianPoint`）
 
 ### Migration

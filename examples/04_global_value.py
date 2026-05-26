@@ -46,9 +46,9 @@ def main(argv: list[str]) -> int:
 
     try:
         with CodroidControlInterface(host=args.robot) as robot:
-            robot.enter_remote_mode_via_auto()
+            robot.EnterRemoteModeViaAuto()
             print("增量保存全局变量 / Saving globals...")
-            res = robot.save_global_vars(vars_to_save)
+            res = robot.SaveGlobalVars(vars_to_save)
             if res.is_success:
                 print("保存成功 / Saved")
             else:

@@ -53,12 +53,12 @@ def main(argv: list[str]) -> int:
         udp_port=args.udp_port,
     ) as robot:
         # 典型上电顺序：先自动再远程（与 C# ConnectRemoteAndSwitchOn 子步骤一致）
-        robot.enter_remote_mode_via_auto()
-        robot.switch_on()
+        robot.EnterRemoteModeViaAuto()
+        robot.SwitchOn()
 
         # 后台线程收 CRI UDP，结果写入 robot.cri_cache（线程安全快照）
         robot._start_cri_receiver()
-        robot.start_cri_data_push(ip=args.local_ip, port=args.udp_port)
+        robot.StartCriDataPush(ip=args.local_ip, port=args.udp_port)
 
         try:
             # 类型化目标：明确是「关节角」而非 TCP
@@ -82,7 +82,7 @@ def main(argv: list[str]) -> int:
             return 130
         finally:
             # 停止推送，释放控制器侧推送任务
-            robot.stop_cri_data_push(ip=args.local_ip, port=args.udp_port)
+            robot.StopCriDataPush(ip=args.local_ip, port=args.udp_port)
 
     return 0
 

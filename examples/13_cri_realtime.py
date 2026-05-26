@@ -61,8 +61,8 @@ def main(argv: list[str]) -> int:
 
     try:
         with CodroidControlInterface(host=args.robot) as robot:
-            robot.enter_remote_mode_via_auto()
-            res = robot.start_cri_data_push(
+            robot.EnterRemoteModeViaAuto()
+            res = robot.StartCriDataPush(
                 ip=args.local_ip,
                 port=args.local_port,
                 duration=args.duration,
@@ -129,7 +129,7 @@ def main(argv: list[str]) -> int:
                         print("状态 / status:", ", ".join(flags))
                     time.sleep(0.05)
             finally:
-                robot.stop_cri_data_push(ip=args.local_ip, port=args.local_port)
+                robot.StopCriDataPush(ip=args.local_ip, port=args.local_port)
     except KeyboardInterrupt:
         return 130
     finally:

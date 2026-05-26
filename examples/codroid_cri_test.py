@@ -92,10 +92,10 @@ def run_joint(robot_ip: str, local_ip: str, local_port: int) -> None:
     p3 = [0.0, 0.0, 90.0, 0.0, 90.0, 0.0]
 
     with CodroidClient(host=robot_ip, local_ip=local_ip, udp_port=local_port) as robot:
-        robot.enter_remote_mode_via_auto()
-        robot.switch_on()
+        robot.EnterRemoteModeViaAuto()
+        robot.SwitchOn()
         robot._start_cri_receiver()
-        robot.start_cri_data_push(ip=local_ip, port=local_port)
+        robot.StartCriDataPush(ip=local_ip, port=local_port)
         cri = _wait_cri(robot)
         start_j = list(cri.joint_pos)
         waypoints = [start_j, p1, p2, p3]
@@ -108,7 +108,7 @@ def run_joint(robot_ip: str, local_ip: str, local_port: int) -> None:
                 traj.append(pt)
 
         _countdown(3)
-        robot.start_cri_control(
+        robot.StartCriControl(
             filter_type=CriFilterType.AVERAGE,
             duration=period_ms,
             start_buffer=5,
@@ -116,10 +116,10 @@ def run_joint(robot_ip: str, local_ip: str, local_port: int) -> None:
         _wait_rt_control(robot)
         try:
             with CriRealtimeDispatcher(robot_ip) as disp:
-                disp.send_trajectory(traj, TrajectorySpace.JOINT, period_ms)
+                disp.SendTrajectory(traj, TrajectorySpace.JOINT, period_ms)
         finally:
-            robot.stop_cri_control()
-            robot.stop_cri_data_push(ip=local_ip, port=local_port)
+            robot.StopCriControl()
+            robot.StopCriDataPush(ip=local_ip, port=local_port)
 
 
 def run_cart(robot_ip: str, local_ip: str, local_port: int) -> None:
@@ -137,10 +137,10 @@ def run_cart(robot_ip: str, local_ip: str, local_port: int) -> None:
     )
 
     with CodroidClient(host=robot_ip, local_ip=local_ip, udp_port=local_port) as robot:
-        robot.enter_remote_mode_via_auto()
-        robot.switch_on()
+        robot.EnterRemoteModeViaAuto()
+        robot.SwitchOn()
         robot._start_cri_receiver()
-        robot.start_cri_data_push(ip=local_ip, port=local_port)
+        robot.StartCriDataPush(ip=local_ip, port=local_port)
         cri = _wait_cri(robot)
         tcp = list(cri.cartesian_pos)
         if len(tcp) < 6:
@@ -165,7 +165,7 @@ def run_cart(robot_ip: str, local_ip: str, local_port: int) -> None:
         traj = TrajectoryGenerator.generate_multi_segment([p0, p1, p2, p3, p4], req)
 
         _countdown(3)
-        robot.start_cri_control(
+        robot.StartCriControl(
             filter_type=CriFilterType.AVERAGE,
             duration=period_ms,
             start_buffer=5,
@@ -173,10 +173,10 @@ def run_cart(robot_ip: str, local_ip: str, local_port: int) -> None:
         _wait_rt_control(robot)
         try:
             with CriRealtimeDispatcher(robot_ip) as disp:
-                disp.send_trajectory(traj, TrajectorySpace.CARTESIAN, period_ms)
+                disp.SendTrajectory(traj, TrajectorySpace.CARTESIAN, period_ms)
         finally:
-            robot.stop_cri_control()
-            robot.stop_cri_data_push(ip=local_ip, port=local_port)
+            robot.StopCriControl()
+            robot.StopCriDataPush(ip=local_ip, port=local_port)
 
 
 def run_path(robot_ip: str, local_ip: str, local_port: int) -> None:
@@ -198,10 +198,10 @@ def run_path(robot_ip: str, local_ip: str, local_port: int) -> None:
     p4 = [927.505, 214.495, 898.994, 180.000, 0.000, -90.000]
 
     with CodroidClient(host=robot_ip, local_ip=local_ip, udp_port=local_port) as robot:
-        robot.enter_remote_mode_via_auto()
-        robot.switch_on()
+        robot.EnterRemoteModeViaAuto()
+        robot.SwitchOn()
         robot._start_cri_receiver()
-        robot.start_cri_data_push(ip=local_ip, port=local_port)
+        robot.StartCriDataPush(ip=local_ip, port=local_port)
         cri = _wait_cri(robot)
         start_tcp = list(cri.cartesian_pos)
         if len(start_tcp) < 6:
@@ -212,7 +212,7 @@ def run_path(robot_ip: str, local_ip: str, local_port: int) -> None:
         )
 
         _countdown(3)
-        robot.start_cri_control(
+        robot.StartCriControl(
             filter_type=CriFilterType.AVERAGE,
             duration=period_ms,
             start_buffer=5,
@@ -220,10 +220,10 @@ def run_path(robot_ip: str, local_ip: str, local_port: int) -> None:
         _wait_rt_control(robot)
         try:
             with CriRealtimeDispatcher(robot_ip) as disp:
-                disp.send_trajectory(traj, TrajectorySpace.CARTESIAN, period_ms)
+                disp.SendTrajectory(traj, TrajectorySpace.CARTESIAN, period_ms)
         finally:
-            robot.stop_cri_control()
-            robot.stop_cri_data_push(ip=local_ip, port=local_port)
+            robot.StopCriControl()
+            robot.StopCriDataPush(ip=local_ip, port=local_port)
 
 
 def main(argv: list[str]) -> int:

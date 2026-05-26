@@ -11,6 +11,7 @@
   cri         CRI 收首帧烟测
   motion      三段 movJ（关节）
   s20         S20 movJ 三点 + movL 四点（需 CRI 快照作 MmDegWithRef）
+  robotparam  机器人设置 19.x（GetRobotParameters / SetToolFrame，见 14_robot_parameters.py）
 
 【运行】
   PYTHONPATH=src python examples/codroid_test.py              # 等同 all，依次全跑
@@ -54,23 +55,23 @@ ALL_CMDS = (
 def cmd_global(robot_ip: str) -> None:
     """globalVar：读全表 → 写入 sdk_demo_py → 再读验证。"""
     with CodroidClient(host=robot_ip) as robot:
-        robot.enter_remote_mode_via_auto()
-        res = robot.get_global_vars()
+        robot.EnterRemoteModeViaAuto()
+        res = robot.GetGlobalVars()
         print("get_global_vars:", res.db)
-        robot.save_global_vars(
+        robot.SaveGlobalVars(
             {"sdk_demo_py": GlobalVariable(value=42, note="codroid_test")}
         )
-        res2 = robot.get_global_vars()
+        res2 = robot.GetGlobalVars()
         print("after save:", res2.db)
 
 
 def cmd_kin(robot_ip: str) -> None:
     """运动学：关节角 → TCP；TCP+参考关节 → 关节角。"""
     with CodroidClient(host=robot_ip) as robot:
-        robot.enter_remote_mode_via_auto()
-        fk = robot.apos_to_cpos([0, 0, 90, 0, 90, 0])
+        robot.EnterRemoteModeViaAuto()
+        fk = robot.AposToCpos([0, 0, 90, 0, 90, 0])
         print("FK:", fk.db)
-        ik = robot.cpos_to_apos(
+        ik = robot.CposToApos(
             [500.0, 200.0, 400.0, 180.0, 0.0, -90.0],
             rj=[0, 0, 90, 0, 90, 0],
         )
@@ -80,9 +81,9 @@ def cmd_kin(robot_ip: str) -> None:
 def cmd_io(robot_ip: str) -> None:
     """读数字输入 DI0。"""
     with CodroidClient(host=robot_ip) as robot:
-        robot.enter_remote_mode_via_auto()
+        robot.EnterRemoteModeViaAuto()
         try:
-            v = robot.get_di(0)
+            v = robot.GetDi(0)
             print("DI0:", v)
         except Exception as e:
             print("get_di:", e)
@@ -91,42 +92,60 @@ def cmd_io(robot_ip: str) -> None:
 def _register_group_a(robot: CodroidClient) -> None:
     """§5.1 组 A：9032–9035 写 1 再清零。"""
     addrs = [9032, 9033, 9034, 9035]
-    print("A read:", robot.get_register_values(addrs).db)
+    print("A read:", robot.GetRegisterValues(addrs).db)
     for a in addrs:
-        robot.set_register_value(a, 1)
+        robot.SetRegisterValue(a, 1)
     for a in addrs:
-        print("A after write", a, robot.get_register(a))
+        print("A after write", a, robot.GetRegisterValue(a))
     for a in addrs:
-        robot.set_register_value(a, 0)
+        robot.SetRegisterValue(a, 0)
 
 
 def _register_group_b(robot: CodroidClient) -> None:
     """§5.1 组 B：整型寄存器写 520。"""
     addrs = [49100, 49102, 49104]
-    print("B read:", robot.get_register_values(addrs).db)
+    print("B read:", robot.GetRegisterValues(addrs).db)
     for a in addrs:
-        robot.set_register_value(a, 520)
+        robot.SetRegisterValue(a, 520)
     for a in addrs:
-        print("B after write", a, robot.get_register(a))
+        print("B after write", a, robot.GetRegisterValue(a))
     for a in addrs:
-        robot.set_register_value(a, 0)
+        robot.SetRegisterValue(a, 0)
 
 
 def _register_group_c(robot: CodroidClient) -> None:
     """§5.1 组 C：浮点寄存器写 520.52。"""
     addrs = [49300, 49302, 49304]
-    print("C read:", robot.get_register_values(addrs).db)
+    print("C read:", robot.GetRegisterValues(addrs).db)
     for a in addrs:
-        robot.set_register_value(a, 520.52)
+        robot.SetRegisterValue(a, 520.52)
     for a in addrs:
-        print("C after write", a, robot.get_register(a))
+        print("C after write", a, robot.GetRegisterValue(a))
     for a in addrs:
-        robot.set_register_value(a, 0.0)
+        robot.SetRegisterValue(a, 0.0)
+
+
+def cmd_robotparam(robot_ip: str) -> None:
+    """委托运行 ``examples/14_robot_parameters.py``（与 C# ``robotparam`` 子命令一致）。"""
+    import os
+    import subprocess
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    script = Path(__file__).resolve().parent / "14_robot_parameters.py"
+    env = os.environ.copy()
+    env["PYTHONPATH"] = os.pathsep.join(
+        [str(root / "src"), env.get("PYTHONPATH", "")]
+    ).strip(os.pathsep)
+    subprocess.check_call(
+        [sys.executable, str(script), "--robot", robot_ip],
+        env=env,
+    )
 
 
 def cmd_register(robot_ip: str) -> None:
     with CodroidClient(host=robot_ip) as robot:
-        robot.enter_remote_mode_via_auto()
+        robot.EnterRemoteModeViaAuto()
         _register_group_a(robot)
         _register_group_b(robot)
         _register_group_c(robot)
@@ -135,7 +154,7 @@ def cmd_register(robot_ip: str) -> None:
 def cmd_robotstatus(robot_ip: str) -> None:
     """主题推送：首次订阅时向控制器发送 {ty, tc}。"""
     with CodroidClient(host=robot_ip) as robot:
-        robot.enter_remote_mode_via_auto()
+        robot.EnterRemoteModeViaAuto()
 
         def on_msg(n: PublishNotification) -> None:
             print("[RobotStatus]", n.ty, n.db)
@@ -152,10 +171,10 @@ def cmd_robotstatus(robot_ip: str) -> None:
 def cmd_cri(robot_ip: str, local_ip: str, local_port: int) -> None:
     """CRI：启动推送，等待 timestamp>0 的首帧。"""
     with CodroidClient(host=robot_ip, local_ip=local_ip, udp_port=local_port) as robot:
-        robot.enter_remote_mode_via_auto()
-        robot.switch_on()
+        robot.EnterRemoteModeViaAuto()
+        robot.SwitchOn()
         robot._start_cri_receiver()
-        robot.start_cri_data_push(ip=local_ip, port=local_port)
+        robot.StartCriDataPush(ip=local_ip, port=local_port)
         deadline = time.time() + 10.0
         while time.time() < deadline:
             d = robot.cri_cache
@@ -165,14 +184,14 @@ def cmd_cri(robot_ip: str, local_ip: str, local_port: int) -> None:
             time.sleep(0.1)
         else:
             print("No CRI frame within timeout")
-        robot.stop_cri_data_push(ip=local_ip, port=local_port)
+        robot.StopCriDataPush(ip=local_ip, port=local_port)
 
 
 def cmd_motion(robot_ip: str) -> None:
     """§5.1 movJ 三段关节目标（度）。"""
     with CodroidClient(host=robot_ip) as robot:
-        robot.enter_remote_mode_via_auto()
-        robot.switch_on()
+        robot.EnterRemoteModeViaAuto()
+        robot.SwitchOn()
         p1 = JointPoint.Degrees([0, 0, 90, 0, 90, 0])
         p2 = JointPoint.Degrees([0, 0, 0, 0, 0, 0])
         robot.MovJ(p1, 40, 100, blend=25)
@@ -198,10 +217,10 @@ def cmd_s20(robot_ip: str, local_ip: str, local_port: int) -> None:
     ]
 
     with CodroidClient(host=robot_ip, local_ip=local_ip, udp_port=local_port) as robot:
-        robot.enter_remote_mode_via_auto()
-        robot.switch_on()
+        robot.EnterRemoteModeViaAuto()
+        robot.SwitchOn()
         robot._start_cri_receiver()
-        robot.start_cri_data_push(ip=local_ip, port=local_port)
+        robot.StartCriDataPush(ip=local_ip, port=local_port)
 
         for jp in jp_targets:
             robot.MovJ(JointPoint.Degrees(jp), 40, 100, blend=25)
@@ -215,7 +234,7 @@ def cmd_s20(robot_ip: str, local_ip: str, local_port: int) -> None:
             rj = list(d.joint_pos)
             robot.MovL(CartesianPoint.MmDegWithRef(cp, rj), 150, 500, blend=25)
 
-        robot.stop_cri_data_push(ip=local_ip, port=local_port)
+        robot.StopCriDataPush(ip=local_ip, port=local_port)
 
 
 def _run_one(
@@ -241,6 +260,8 @@ def _run_one(
         cmd_motion(robot_ip)
     elif cmd == "s20":
         cmd_s20(robot_ip, local_ip, local_port)
+    elif cmd == "robotparam":
+        cmd_robotparam(robot_ip)
     else:
         raise ValueError(f"unknown cmd: {cmd}")
 
@@ -260,6 +281,7 @@ def main(argv: list[str]) -> int:
     sub.add_parser("cri", help="CRI 收包烟测")
     sub.add_parser("motion", help="movJ 三段")
     sub.add_parser("s20", help="S20 movJ + movL + CRI")
+    sub.add_parser("robotparam", help="机器人设置 19.x（会改 Tool[2]）")
 
     args = p.parse_args(argv)
     cmds = ALL_CMDS if args.cmd in (None, "all") else (args.cmd,)

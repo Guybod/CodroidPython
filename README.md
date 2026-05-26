@@ -44,8 +44,8 @@ InitConsoleUtf8()  # Windows cmd 下中文日志不乱码；Linux 上为 no-op
 ROBOT_IP = "192.168.1.136"  # 改成实际控制器 IP
 
 with CodroidControlInterface(host=ROBOT_IP) as robot:
-    robot.to_remote()
-    robot.switch_on()
+    robot.ToRemote()
+    robot.SwitchOn()
 ```
 
 运行：
@@ -100,7 +100,7 @@ robot.Move(path)
 
 打包规则：`jp` 优先；仅 `cp` 时若未提供 `rj`，JSON 中带默认 `[20,20,20,20,20,20]`（度）。
 
-**Breaking（2.1.0）**：请勿再用 `MovePoint(jp=...)` 作业务入口；`move_j` / `move_l` 已废弃，见 [CHANGELOG.md](CHANGELOG.md)。
+**Breaking（2.1.1）**：公开 API 与 C# 一致，统一 **PascalCase**（`Connect`、`SwitchOn`、`GetDi`、`MovJ`、`SetToolFrame` 等）；`CriData` 为属性；`move_j` / `switch_on` 等 snake_case 已移除。见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## Windows 控制台 UTF-8
 
@@ -124,17 +124,21 @@ from codroid import CodroidClient, InitConsoleUtf8
 InitConsoleUtf8()
 
 with CodroidClient(host="192.168.1.136") as robot:
-    robot.to_remote()
-    robot.switch_on()
+    robot.ToRemote()
+    robot.SwitchOn()
 ```
 
 ## 示例
 
 ```bash
 PYTHONPATH=src python examples/08_move.py --robot 192.168.8.136
+PYTHONPATH=src python examples/14_robot_parameters.py --robot 192.168.8.136
 PYTHONPATH=src python examples/codroid_test.py motion
 PYTHONPATH=src python examples/codroid_test.py s20
+PYTHONPATH=src python examples/codroid_test.py robotparam
 ```
+
+机器人设置（协议 19.x）：`GetRobotParameters`、`SetToolFrame`、`SetDefaultToolId` 等见 `examples/14_robot_parameters.py`。
 
 寄存器与 S20 运动常量见仓库根目录 `AGENTS.md` §5.1。
 

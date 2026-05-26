@@ -407,7 +407,7 @@ class MoveInstruction:
 
 
 @dataclass
-class MoveTarget:
+class MoveToTarget:
     """
     MoveTo 专用目标结构（C# ``MoveToTarget`` / ``Robot/moveTo`` 的 target 字段）。
     """
@@ -417,12 +417,12 @@ class MoveTarget:
     ep: Sequence[float] = field(default_factory=list)
 
     @classmethod
-    def Joint(cls, joint: JointPoint) -> MoveTarget:
+    def Joint(cls, joint: JointPoint) -> MoveToTarget:
         """关节目标（度）。"""
         return cls(jp=list(joint.jp))
 
     @classmethod
-    def Cartesian(cls, cart: CartesianPoint) -> MoveTarget:
+    def Cartesian(cls, cart: CartesianPoint) -> MoveToTarget:
         """笛卡尔目标（mm + 度）；``moveTo`` 协议不使用 ``rj``。"""
         return cls(cp=list(cart.cp))
 
@@ -433,10 +433,6 @@ class MoveTarget:
         if self.jp is not None:
             d["jp"] = list(self.jp)
         return d
-
-
-# C# 命名别名
-MoveToTarget = MoveTarget
 
 # =============================================================================
 # 5. CRI 实时接口模型 / CRI Real-time Models
@@ -618,7 +614,7 @@ class MotionPath:
         self._commands.append(item)
         return self
 
-    def mov_j(
+    def MovJ(
         self,
         target: Union[MovePoint, JointPoint, CartesianPoint],
         speed: float,
@@ -628,7 +624,7 @@ class MotionPath:
         """添加关节运动 movJ。"""
         return self._add_item(MotionType.MOVJ, target, speed, acc, blend)
 
-    def mov_l(
+    def MovL(
         self,
         target: Union[MovePoint, JointPoint, CartesianPoint],
         speed: float,
@@ -638,7 +634,7 @@ class MotionPath:
         """添加直线运动 movL。"""
         return self._add_item(MotionType.MOVL, target, speed, acc, blend)
 
-    def mov_c(
+    def MovC(
         self,
         target: Union[CartesianPoint, Sequence[float]],
         middle: Union[CartesianPoint, Sequence[float]],

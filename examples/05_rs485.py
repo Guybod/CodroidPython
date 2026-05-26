@@ -36,20 +36,20 @@ def main(argv: list[str]) -> int:
 
     try:
         with CodroidControlInterface(host=args.robot) as robot:
-            robot.enter_remote_mode_via_auto()
+            robot.EnterRemoteModeViaAuto()
 
             # 配置末端 485 参数（枚举与 C# RS485BaudRate 对齐）
             print("初始化 115200 N 8 1 / RS485 init")
-            robot.rs485_init(baudrate=RS485BaudRate.B115200)
-            robot.rs485_flush()
+            robot.Rs485Init(baudrate=RS485BaudRate.B115200)
+            robot.Rs485Flush()
 
             # 示例 Modbus RTU：站号 1，功能码 03，读 2 个寄存器（CRC 已含在帧内）
             cmd = b"\x01\x03\x00\x00\x00\x02\xC4\x0B"
             print(f"发送 / TX: {cmd.hex()}")
-            robot.rs485_write(cmd)
+            robot.Rs485Write(cmd)
 
             print("读取响应（7 字节，1s 超时）/ Read...")
-            res = robot.rs485_read(length=7, timeout=1000)
+            res = robot.Rs485Read(length=7, timeout=1000)
             if res.is_success and res.db:
                 received = bytes(res.db)
                 print(f"收到 / RX (hex): {received.hex()}")

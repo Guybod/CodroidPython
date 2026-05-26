@@ -28,6 +28,7 @@ from .trajectory import (
 from .cri_realtime_dispatcher import CriRealtimeDispatcher
 from .console import PrintBanner
 from .console_utf8 import InitConsoleUtf8, init_console_utf8
+from .robot_settings import RobotFrame, RobotParameters, RobotPayloadFrame
 
 __all__ = [
     "__version__",
@@ -55,7 +56,6 @@ __all__ = [
     "JogMode",
     "JogCoorType",
     "MoveToType",
-    "MoveTarget",
     "MoveToTarget",
     "JointPoint",
     "CartesianPoint",
@@ -80,4 +80,7 @@ __all__ = [
     "PrintBanner",
     "InitConsoleUtf8",
     "init_console_utf8",
+    "RobotFrame",
+    "RobotPayloadFrame",
+    "RobotParameters",
 ]

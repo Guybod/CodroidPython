@@ -51,7 +51,7 @@ class CriRealtimeDispatcher:
             math.radians(p[5]),
         ]
 
-    def send_command(self, position6: Sequence[float], space: TrajectorySpace) -> None:
+    def SendCommand(self, position6: Sequence[float], space: TrajectorySpace) -> None:
         data = self._to_wire(position6, space)
         type_byte = 0 if space == TrajectorySpace.JOINT else 1
         nc = (0, 0, 0, 0, 0, 0, 0)
@@ -68,7 +68,7 @@ class CriRealtimeDispatcher:
         )
         self._sock.sendto(packet, (self._controller_ip, self._controller_port))
 
-    def send_trajectory(
+    def SendTrajectory(
         self,
         trajectory: Iterable[TrajectoryPoint],
         space: TrajectorySpace,
@@ -78,10 +78,8 @@ class CriRealtimeDispatcher:
             raise ValueError("period_ms must be in (0, 1000]")
         traj_list = list(trajectory)
         for i, pt in enumerate(traj_list):
-            self.send_command(pt.position, space)
+            self.SendCommand(pt.position, space)
             if i < len(traj_list) - 1:
                 time.sleep(period_ms / 1000.0)
 
     # C# ``CriRealtimeDispatcher.SendCommand`` / ``SendTrajectory``
-    SendCommand = send_command
-    SendTrajectory = send_trajectory

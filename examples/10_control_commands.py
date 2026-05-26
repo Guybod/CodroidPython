@@ -38,28 +38,28 @@ def main(argv: list[str]) -> int:
 
     try:
         with CodroidControlInterface(host=args.robot) as robot:
-            robot.enter_remote_mode_via_auto()
+            robot.EnterRemoteModeViaAuto()
             try:
                 print("清错 / clear_system_error")
-                robot.clear_system_error()
+                robot.ClearSystemError()
                 time.sleep(0.5)
 
                 print("上使能 / switch_on")
-                robot.switch_on()
+                robot.SwitchOn()
                 time.sleep(1)
 
                 print("仿真模式 / to_simulation")
-                robot.to_simulation()
+                robot.ToSimulation()
 
                 print("拖拽开始 / start_drag")
-                robot.start_drag()
+                robot.StartDrag()
                 time.sleep(args.drag_seconds)
 
                 print("拖拽结束 / stop_drag")
-                robot.stop_drag()
+                robot.StopDrag()
 
                 print("下使能 / switch_off")
-                robot.switch_off()
+                robot.SwitchOff()
             except CodroidError as e:
                 # 控制器 err 字段映射为 CodroidError
                 print(f"CodroidError: {e}", file=sys.stderr)

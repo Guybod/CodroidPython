@@ -34,22 +34,22 @@ def main(argv: list[str]) -> int:
 
     try:
         with CodroidControlInterface(host=args.robot) as robot:
-            robot.enter_remote_mode_via_auto()
+            robot.EnterRemoteModeViaAuto()
 
             print("DO 10 = 1 / set_do(10, 1)")
-            robot.set_do(10, 1)
+            robot.SetDo(10, 1)
 
-            di_val = robot.get_di(0)
+            di_val = robot.GetDi(0)
             print(f"DI 0 = {di_val}")
 
             print("AO 2 = 4.44 / set_ao")
-            robot.set_ao(2, 4.44)
+            robot.SetAo(2, 4.44)
 
-            ai_val = robot.get_ai(1)
+            ai_val = robot.GetAi(1)
             print(f"AI 1 = {ai_val}")
 
             # 批量读：每项为 {type, port}，type 为 DI/DO/AI/AO 字符串
-            res = robot.get_io_values(
+            res = robot.GetIoValues(
                 [
                     {"type": "DI", "port": 0},
                     {"type": "AI", "port": 1},

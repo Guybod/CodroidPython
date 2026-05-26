@@ -18,7 +18,7 @@
   PYTHONPATH=src python examples/07_move_to.py --robot <IP>
 
 【注意】
-  - 目标请用 ``MoveTarget.Joint`` / ``MoveTarget.Cartesian``（2.1+），勿裸填数组
+  - 目标请用 ``MoveToTarget.Joint`` / ``MoveToTarget.Cartesian``，勿裸填数组
   - moveTo 的 target 不走 movL 的默认 rj 逻辑
 """
 from __future__ import annotations
@@ -33,7 +33,7 @@ from codroid import (
     CodroidControlInterface,
     InitConsoleUtf8,
     JointPoint,
-    MoveTarget,
+    MoveToTarget,
     MoveToType,
     PrintBanner,
 )
@@ -63,8 +63,8 @@ def main(argv: list[str]) -> int:
 
     try:
         with CodroidControlInterface(host=args.robot) as robot:
-            robot.enter_remote_mode_via_auto()
-            robot.switch_on()
+            robot.EnterRemoteModeViaAuto()
+            robot.SwitchOn()
 
             # --- 场景 1：预设 Home，无需 target ---
             PrintBanner("Scene 1 — HOME", subtitle="MoveToType.HOME")
@@ -78,7 +78,7 @@ def main(argv: list[str]) -> int:
 
             # --- 场景 2：关节空间规划到指定六轴角 ---
             PrintBanner("Scene 2 — JOINT (Type 4)", subtitle="关节规划")
-            target_joints = MoveTarget.Joint(JointPoint.Degrees([0.0] * 6))
+            target_joints = MoveToTarget.Joint(JointPoint.Degrees([0.0] * 6))
             robot.MoveTo(MoveToType.JOINT, target=target_joints)
             stop_event.clear()
             t = threading.Thread(target=heartbeat_worker, args=(robot, stop_event))
@@ -89,7 +89,7 @@ def main(argv: list[str]) -> int:
 
             # --- 场景 3：笛卡尔直线到 TCP 位姿（mm + 度）---
             PrintBanner("Scene 3 — LINEAR (Type 5)", subtitle="直线规划")
-            target_pose = MoveTarget.Cartesian(
+            target_pose = MoveToTarget.Cartesian(
                 CartesianPoint.MmDeg([350.0, 100.0, 400.0, 180.0, 0.0, 90.0]),
             )
             robot.MoveTo(MoveToType.LINEAR, target=target_pose)

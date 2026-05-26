@@ -44,31 +44,31 @@ def main(argv: list[str]) -> int:
 
     try:
         with CodroidControlInterface(host=args.robot) as robot:
-            robot.enter_remote_mode_via_auto()
+            robot.EnterRemoteModeViaAuto()
 
             # 按工程名启动
-            res = robot.run_project(args.project_id)
+            res = robot.Run(args.project_id)
             print("运行 / run:", "ok" if res.is_success else res.err)
             time.sleep(args.step_sleep)
 
-            res = robot.pause_project()
+            res = robot.PauseProject()
             print("暂停 / pause:", "ok" if res.is_success else res.err)
             time.sleep(args.step_sleep)
 
-            res = robot.resume_project()
+            res = robot.ResumeProject()
             print("恢复 / resume:", "ok" if res.is_success else res.err)
             time.sleep(args.step_sleep)
 
-            res = robot.stop_project()
+            res = robot.StopProject()
             print("停止 / stop:", "ok" if res.is_success else res.err)
             time.sleep(args.step_sleep)
 
             # 按索引启动（与示教器工程列表顺序相关）
-            res = robot.run_project_by_index(args.index)
+            res = robot.RunByIndex(args.index)
             print("按索引启动 / by_index:", "ok" if res.is_success else res.err)
             time.sleep(args.step_sleep)
 
-            res = robot.stop_project()
+            res = robot.StopProject()
             print("再次停止 / stop:", "ok" if res.is_success else res.err)
     except KeyboardInterrupt:
         return 130

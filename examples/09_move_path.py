@@ -78,8 +78,8 @@ def main(argv: list[str]) -> int:
 
     try:
         with CodroidControlInterface(host=args.robot) as robot:
-            robot.enter_remote_mode_via_auto()
-            robot.switch_on()
+            robot.EnterRemoteModeViaAuto()
+            robot.SwitchOn()
             print("发送连续路径 / Sending path...")
             res = robot.Move(path)
             if res.is_success:

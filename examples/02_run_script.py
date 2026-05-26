@@ -41,9 +41,9 @@ def main(argv: list[str]) -> int:
 
     try:
         with CodroidControlInterface(host=args.robot) as robot:
-            robot.enter_remote_mode_via_auto()
+            robot.EnterRemoteModeViaAuto()
             print("发送脚本 / Sending script...")
-            res = robot.run_script(lua_code, vars=vars_data)
+            res = robot.RunScript(lua_code, vars=vars_data)
             if res.is_success:
                 print("脚本请求已发送 / Script request sent")
             else:

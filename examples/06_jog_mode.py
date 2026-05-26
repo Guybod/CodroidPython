@@ -38,7 +38,7 @@ def start_heartbeat(
     """后台线程：在点动保持期间周期调用 jog_heartbeat。"""
     while not stop_event.is_set():
         try:
-            robot.jog_heartbeat()
+            robot.JogHeartbeat()
             time.sleep(interval)
         except Exception:
             # 连接断开或已 stop 时退出线程
@@ -55,10 +55,10 @@ def main(argv: list[str]) -> int:
 
     try:
         with CodroidControlInterface(host=args.robot) as robot:
-            robot.enter_remote_mode_via_auto()
-            robot.switch_on()
+            robot.EnterRemoteModeViaAuto()
+            robot.SwitchOn()
             # 手动模式运动倍率 1~100（百分比）
-            robot.set_manual_move_rate(50)
+            robot.SetManualMoveRate(50)
 
             stop_heartbeat = threading.Event()
             heartbeat_thread = threading.Thread(
@@ -69,14 +69,14 @@ def main(argv: list[str]) -> int:
 
             print("关节 1 点动（示例速度）/ Jog joint 1...")
             # JogMode.JOINT + index + speed（比例）
-            robot.start_jog(mode=JogMode.JOINT, index=1, speed=-0.5)
+            robot.StartJog(mode=JogMode.JOINT, index=1, speed=-0.5)
             heartbeat_thread.start()
             time.sleep(args.duration)
 
             print("停止点动 / Stop jog")
             stop_heartbeat.set()
             heartbeat_thread.join(timeout=2.0)
-            robot.stop_jog()
+            robot.StopJog()
     except KeyboardInterrupt:
         return 130
     return 0

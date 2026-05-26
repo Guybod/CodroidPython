@@ -97,12 +97,4 @@ class CodroidClient(CodroidSession):
 
         return PublishTopicSubscription(_dispose)
 
-    def subscribe_publish_topic(
-        self,
-        topic_ty: str,
-        handler: Callable[[PublishNotification], None],
-        tc_milliseconds: int = 100,
-    ) -> PublishTopicSubscription:
-        # Temporary pythonic alias during migration.
-        return self.SubscribePublishTopic(topic_ty, handler, tc_milliseconds=tc_milliseconds)
 

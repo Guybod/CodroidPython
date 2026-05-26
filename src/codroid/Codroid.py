@@ -8,7 +8,6 @@ from __future__ import annotations
 import threading
 import socket
 import time
-import warnings
 from typing import Any, Dict, List, Literal, Optional, Union, Sequence, cast
 from .async_tcp_client import JsonStreamClient
 from .exceptions import CodroidError
@@ -22,7 +21,7 @@ class CodroidSession:
     TCP/UDP 协议会话与指令封装。
 
     C# 侧等价能力内聚于 ``CodroidClient``；Python 中 ``CodroidClient`` 继承本类并替换传输层。
-    对外请优先使用 ``CodroidClient``；方法名与 AGENTS.md §4.1 词序一致（snake_case）。
+    对外请优先使用 ``CodroidClient``；公开方法名与 C# / AGENTS.md §4.1 一致（PascalCase）。
     """
     
     def __init__(self, host: str = "192.168.1.136", port: int = 9001,
@@ -93,7 +92,7 @@ class CodroidSession:
 
     # --- 连接管理 / Connection Management ---
 
-    def connect(self) -> "CodroidSession":
+    def Connect(self) -> "CodroidSession":
         """
         建立 TCP 连接 / Establish TCP connection.
 
@@ -156,37 +155,36 @@ class CodroidSession:
             handler._sock.close()
 
 
-    def close(self):
+    def _close_connection(self):
         """
         关闭连接 / Close connection.
         """
         try:
-            self.stop_cri_data_push()
+            self.StopCriDataPush()
         finally:
             self._stop_cri_receiver()
             self._net.close()
 
-    def disconnect(self):
-        """
-        断开连接 (close 的别名) / Disconnect (alias for close).
-        """
-        self.close()
+    def Disconnect(self):
+        """断开 TCP 并停止 CRI 接收（C# ``Disconnect``）。"""
+        self._close_connection()
 
-    def get_cri_data(self) -> Optional[CriRealTimeData]:
-        """最新 CRI 快照，等价 C# 侧 ``CriData`` 缓存（``cri_cache``）。"""
+    @property
+    def CriData(self) -> Optional[CriRealTimeData]:
+        """最新 CRI 快照（C# ``CriData``，内部 ``cri_cache``）。"""
         return self.cri_cache
 
-    def start_listen_udp(self): 
+    def StartListenUdp(self): 
         try:            
             # 1. 先停止旧的推送
-            self.stop_cri_data_push()
+            self.StopCriDataPush()
             time.sleep(0.1)
             
             # 2. 先在本地打开 UDP 监听端口
             self._start_cri_receiver() 
             
             # 3. 再通知机器人开始推送数据
-            self.start_cri_data_push(ip=self.local_ip, port=self.udp_port)
+            self.StartCriDataPush(ip=self.local_ip, port=self.udp_port)
             
             if self.debug:
                 print(f"实时数据同步已开启，监听端口: {self.udp_port}")
@@ -198,7 +196,7 @@ class CodroidSession:
 
     # --- 接口实现 ---
 
-    def run_script(self, main_script: str, vars: Optional[Dict[str, Any]] = None) -> CommonResponse:
+    def RunScript(self, main_script: str, vars: Optional[Dict[str, Any]] = None) -> CommonResponse:
         """
         2.1 运行脚本 / Run script（C# ``RunScript``）。
 
@@ -217,9 +215,9 @@ class CodroidSession:
 
     def __run_script(self, main_script: str, vars: Optional[Dict[str, Any]] = None) -> CommonResponse:
         """兼容旧代码调用 ``__run_script``。"""
-        return self.run_script(main_script, vars)
+        return self.RunScript(main_script, vars)
 
-    def enter_remote_script_mode(self) -> CommonResponse:
+    def EnterRemoteScriptMode(self) -> CommonResponse:
         """
         2.2 进入远程脚本模式 / Enter remote script mode.
 
@@ -228,7 +226,7 @@ class CodroidSession:
         """
         return self._send_command("project/enterRemoteScriptMode")
 
-    def run_project(self, project_id: str) -> CommonResponse:
+    def Run(self, project_id: str) -> CommonResponse:
         """
         2.3 运行指定工程 / Run specified project.
 
@@ -240,7 +238,7 @@ class CodroidSession:
         """
         return self._send_command("project/run", {"id": project_id})
 
-    def run_project_by_index(self, index: int) -> CommonResponse:
+    def RunByIndex(self, index: int) -> CommonResponse:
         """
         2.4 通过索引号运行工程 / Run project by index（C# ``RunByIndex``）。
 
@@ -252,13 +250,13 @@ class CodroidSession:
         """
         return self._send_command("project/runByIndex", index)
 
-    def run_step(self, project_id: str) -> CommonResponse:
+    def RunStep(self, project_id: str) -> CommonResponse:
         """
         2.5 单步运行（C# ``RunStep``）。
         """
         return self._send_command("project/run", {"id": project_id})
 
-    def pause_project(self) -> CommonResponse:
+    def PauseProject(self) -> CommonResponse:
         """
         2.6 暂停工程 / Pause project.
 
@@ -267,7 +265,7 @@ class CodroidSession:
         """
         return self._send_command("project/pause")
 
-    def resume_project(self) -> CommonResponse:
+    def ResumeProject(self) -> CommonResponse:
         """
         2.7 恢复运行 / Resume project.
 
@@ -276,7 +274,7 @@ class CodroidSession:
         """
         return self._send_command("project/resume")
 
-    def stop_project(self) -> CommonResponse:
+    def StopProject(self) -> CommonResponse:
         """
         2.8 停止运行 / Stop project.
 
@@ -285,7 +283,7 @@ class CodroidSession:
         """
         return self._send_command("project/stop")
 
-    def set_start_line(self, line: int) -> CommonResponse:
+    def SetStartLine(self, line: int) -> CommonResponse:
         """
         2.13 设置启动行 / Set start line.
 
@@ -297,7 +295,7 @@ class CodroidSession:
         """
         return self._send_command("project/setStartLine", line)
 
-    def clear_start_line(self) -> CommonResponse:
+    def ClearStartLine(self) -> CommonResponse:
         """
         2.14 清除启动行设置 / Clear start line setting.
 
@@ -306,7 +304,7 @@ class CodroidSession:
         """
         return self._send_command("project/clearStartLine")
 
-    def get_global_vars(self):
+    def GetGlobalVars(self):
         """
         3.2 获取全局变量 / Get global variables（C# ``GetGlobalVars``）。
 
@@ -315,14 +313,14 @@ class CodroidSession:
         """
         return self._send_command("globalVar/getVars")
 
-    def get_global_vars_catalog(self):
+    def GetGlobalVarsCatalog(self):
         """
         C# ``GetGlobalVarsCatalog``：与 ``get_global_vars`` 相同 TCP 请求（``globalVar/getVars``）；
         C# 侧再经 ``GlobalVarCatalogParser`` 解析；Python 当前直接返回原始 ``CommonResponse``。
         """
-        return self.get_global_vars()
+        return self.GetGlobalVars()
 
-    def save_global_vars(self, variables: Dict[str, GlobalVariable]) -> CommonResponse:
+    def SaveGlobalVars(self, variables: Dict[str, GlobalVariable]) -> CommonResponse:
         """
         3.3 保存全局变量 / Save global variables（C# ``SaveGlobalVars``）。
 
@@ -344,11 +342,11 @@ class CodroidSession:
             
         return self._send_command("globalVar/saveVars", db_payload)
 
-    def save_global_var(self, name: str, variable: GlobalVariable) -> CommonResponse:
+    def SaveGlobalVar(self, name: str, variable: GlobalVariable) -> CommonResponse:
         """C# ``SaveGlobalVar``：单变量增量保存。"""
-        return self.save_global_vars({name: variable})
+        return self.SaveGlobalVars({name: variable})
     
-    def remove_global_vars(self, names: List[str]) -> CommonResponse:
+    def RemoveGlobalVars(self, names: List[str]) -> CommonResponse:
         """
         3.4 删除全局变量 / Remove global variables（C# ``RemoveGlobalVars``）。
 
@@ -365,7 +363,7 @@ class CodroidSession:
                 
         return self._send_command("globalVar/removeVars", names)
 
-    def get_project_var(self):
+    def GetProjectVar(self):
         """
         4.1 获取当前所有工程变量值(仅在工程运行中有效) / Get the values of all current project variables (only valid when the project is running)
 
@@ -374,7 +372,7 @@ class CodroidSession:
         """
         return self._send_command("globalVar/GetProjectVarUpdate")
 
-    def rs485_init(
+    def Rs485Init(
         self, baudrate: Union[RS485BaudRate, int], 
         stop_bit: RS485StopBits = RS485StopBits.ONE, 
         parity: RS485Parity = RS485Parity.NONE
@@ -398,7 +396,7 @@ class CodroidSession:
         }
         return self._send_command("EC2RS485/init", db)
 
-    def rs485_flush(self) -> CommonResponse:
+    def Rs485Flush(self) -> CommonResponse:
         """
         5.2 清空 485 读取缓存 / Flush RS485 read buffer.
 
@@ -407,7 +405,7 @@ class CodroidSession:
         """
         return self._send_command("EC2RS485/flushReadBuffer")
 
-    def rs485_read(self, length: int, timeout: int = 3000) -> CommonResponse:
+    def Rs485Read(self, length: int, timeout: int = 3000) -> CommonResponse:
         """
         5.3 读取 485 数据 / Read RS485 data.
 
@@ -429,7 +427,7 @@ class CodroidSession:
         }
         return self._send_command("EC2RS485/read", db)
 
-    def rs485_write(self, data: Union[List[int], bytes]) -> CommonResponse:
+    def Rs485Write(self, data: Union[List[int], bytes]) -> CommonResponse:
         """
         5.4 发送 485 数据 / Write RS485 data.
 
@@ -452,7 +450,7 @@ class CodroidSession:
 
     # --- 10. 机器人计算接口 / Robot Calculation ---
 
-    def apos_to_cpos(
+    def AposToCpos(
         self, 
         jp: Sequence[float], 
         coor: Optional[Sequence[float]] = None, 
@@ -483,7 +481,7 @@ class CodroidSession:
             
         return self._send_command("Robot/apostocpos", db)
 
-    def cpos_to_apos(
+    def CposToApos(
         self, 
         cp: Sequence[float], 
         rj: Optional[Sequence[float]] = None, 
@@ -511,7 +509,7 @@ class CodroidSession:
         }
         return self._send_command("Robot/cpostoapos", db)
 
-    def calculate_relative_pose(
+    def CalculateRelativePose(
         self,
         pos: Sequence[float],
         offset: Sequence[float],
@@ -543,7 +541,7 @@ class CodroidSession:
 
     # --- 11. 机器人运动控制接口 / Robot Motion Control ---
 
-    def start_jog(
+    def StartJog(
         self, 
         mode: JogMode, 
         index: int, 
@@ -571,13 +569,13 @@ class CodroidSession:
         }
         return self._send_command("Robot/jog", db)
 
-    def stop_jog(self) -> CommonResponse:
+    def StopJog(self) -> CommonResponse:
         """
         11.2 停止点动 / Stop robot jogging.
         """
         return self._send_command("Robot/stopJog", "")
 
-    def jog_heartbeat(self) -> CommonResponse:
+    def JogHeartbeat(self) -> CommonResponse:
         """
         11.3 点动心跳 / Jog heartbeat.
         需在点动期间每隔 0.5s 发送一次。
@@ -587,12 +585,12 @@ class CodroidSession:
     def MoveTo(
         self,
         move_type: MoveToType,
-        target: Optional[MoveTarget] = None,
+        target: Optional[MoveToTarget] = None,
     ) -> CommonResponse:
         """
         11.4 运动到指定位置（C# ``MoveTo`` / ``Robot/moveTo``）。
 
-        关节/直线目标请用 ``MoveTarget.Joint`` / ``MoveTarget.Cartesian`` 构造。
+        关节/直线目标请用 ``MoveToTarget.Joint`` / ``MoveToTarget.Cartesian`` 构造。
         启动后须每 0.5s 调用 ``MoveToHeartbeat()``。
         """
         db: Dict[str, Any] = {"type": int(move_type)}
@@ -600,23 +598,11 @@ class CodroidSession:
             db["target"] = target.to_dict()
         return self._send_command("Robot/moveTo", db)
 
-    def move_to(
-        self,
-        move_type: MoveToType,
-        target: Optional[MoveTarget] = None,
-    ) -> CommonResponse:
-        """兼容别名，请改用 ``MoveTo``。"""
-        return self.MoveTo(move_type, target)
-
     def MoveToHeartbeat(self) -> CommonResponse:
         """11.5 moveTo 心跳（C# ``MoveToHeartbeat``）。"""
         return self._send_command("Robot/moveToHeartbeat")
 
-    def move_to_heartbeat(self) -> CommonResponse:
-        """兼容别名，请改用 ``MoveToHeartbeat``。"""
-        return self.MoveToHeartbeat()
-
-    def set_manual_move_rate(self, rate: int) -> CommonResponse:
+    def SetManualMoveRate(self, rate: int) -> CommonResponse:
         """
         11.6 设置手动运动倍率 / Set manual move rate.
 
@@ -627,7 +613,7 @@ class CodroidSession:
             raise CodroidError("倍率范围必须在 1~100 之间 / The magnification range must be between 1 and 100")
         return self._send_command("Robot/setManualMoveRate", rate)
 
-    def set_auto_move_rate(self, rate: int) -> CommonResponse:
+    def SetAutoMoveRate(self, rate: int) -> CommonResponse:
         """
         11.7 设置自动运动倍率 / Set auto move rate.
 
@@ -676,13 +662,6 @@ class CodroidSession:
         if not cmds:
             raise CodroidError("运动指令列表不能为空 / Move command list cannot be empty")
         return self._send_move_commands(cmds)
-
-    def move(
-        self,
-        path: Union[MotionPath, List[MoveInstruction], List[Dict[str, Any]]],
-    ) -> CommonResponse:
-        """兼容别名，请改用 ``Move``。"""
-        return self.Move(path)
 
     def MovJ(
         self,
@@ -801,119 +780,23 @@ class CodroidSession:
         )
         return self._send_move_commands([self._motion_instruction_item(inst)])
 
-    def move_j(
-        self,
-        target: MovePoint,
-        speed: float,
-        acc: float,
-        blend: float = 0.0,
-        coor: Optional[Sequence[float]] = None,
-        tool: Optional[Sequence[float]] = None,
-    ) -> CommonResponse:
-        """已废弃：请改用 ``MovJ(JointPoint.Degrees(...))`` 或 ``MovJ(CartesianPoint.MmDeg(...))``。"""
-        warnings.warn(
-            "move_j(MovePoint, ...) is deprecated; use MovJ(JointPoint|CartesianPoint, ...)",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.MovJ(target, speed, acc, blend=blend, coor=coor, tool=tool)
-
-    def move_l(
-        self,
-        target: MovePoint,
-        speed: float,
-        acc: float,
-        blend: float = 0.0,
-        coor: Optional[Sequence[float]] = None,
-        tool: Optional[Sequence[float]] = None,
-    ) -> CommonResponse:
-        """已废弃：请改用 ``MovL(CartesianPoint|JointPoint, ...)``。"""
-        warnings.warn(
-            "move_l(MovePoint, ...) is deprecated; use MovL(CartesianPoint|JointPoint, ...)",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.MovL(target, speed, acc, blend=blend, coor=coor, tool=tool)
-
-    def move_c(
-        self,
-        target_cp: Sequence[float],
-        middle_cp: Sequence[float],
-        speed: float,
-        acc: float,
-        blend: float = 0.0,
-        coor: Optional[Sequence[float]] = None,
-        tool: Optional[Sequence[float]] = None,
-    ) -> CommonResponse:
-        """已废弃：请改用 ``MovC(CartesianPoint, CartesianPoint, ...)``。"""
-        warnings.warn(
-            "move_c is deprecated; use MovC with CartesianPoint.MmDeg(...)",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.MovC(
-            CartesianPoint.MmDeg(middle_cp),
-            CartesianPoint.MmDeg(target_cp),
-            speed,
-            acc,
-            blend=blend,
-            coor=coor,
-            tool=tool,
-        )
-
-    def move_circle(
-        self,
-        target_cp: Sequence[float],
-        middle_cp: Sequence[float],
-        speed: float,
-        acc: float,
-        circle_num: int = 1,
-        coor: Optional[Sequence[float]] = None,
-        tool: Optional[Sequence[float]] = None,
-    ) -> CommonResponse:
-        """已废弃：请改用 ``MovCircle``。"""
-        warnings.warn(
-            "move_circle is deprecated; use MovCircle with CartesianPoint.MmDeg(...)",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.MovCircle(
-            CartesianPoint.MmDeg(middle_cp),
-            CartesianPoint.MmDeg(target_cp),
-            circle_num,
-            speed,
-            acc,
-            blend=blend,
-            coor=coor,
-            tool=tool,
-        )
-
-    def execute_path(self, path: MotionPath) -> CommonResponse:
-        """已废弃：请改用 ``Move(path)``。"""
-        warnings.warn(
-            "execute_path is deprecated; use Move(path)",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.Move(path)
-
     # --- 11.9 - 11.11 运动控制 ---
 
-    def pause_robot_motion(self) -> CommonResponse:
+    def PauseRobotMotion(self) -> CommonResponse:
         """11.9 暂停运动 / Pause robot motion（C# ``PauseRobotMotion``）。"""
         return self._send_command("Robot/pause", "")
 
-    def resume_robot_motion(self) -> CommonResponse:
+    def ResumeRobotMotion(self) -> CommonResponse:
         """11.10 恢复运动 / Resume robot motion（C# ``ResumeRobotMotion``）。"""
         return self._send_command("Robot/resume", "")
 
-    def stop_robot_move(self) -> CommonResponse:
+    def StopRobotMove(self) -> CommonResponse:
         """11.11 停止运动 / Stop robot move（C# ``StopRobotMove``）。"""
         return self._send_command("Robot/stopMove", "")
 
     # --- 12. 机器人控制命令 / Robot Control Commands ---
 
-    def switch_on(self) -> CommonResponse:
+    def SwitchOn(self) -> CommonResponse:
         """
         12.1 上使能 / Enable the robot.
 
@@ -922,7 +805,7 @@ class CodroidSession:
         """
         return self._send_command("Robot/switchOn", "")
 
-    def switch_off(self) -> CommonResponse:
+    def SwitchOff(self) -> CommonResponse:
         """
         12.2 下使能 / Disable the robot.
 
@@ -931,7 +814,7 @@ class CodroidSession:
         """
         return self._send_command("Robot/switchOff", "")
 
-    def to_manual(self) -> CommonResponse:
+    def ToManual(self) -> CommonResponse:
         """
         12.3 进入手动模式 / ``Robot/toManual``（C# ``ToManual``，不含模式跳转组合）。
 
@@ -940,12 +823,12 @@ class CodroidSession:
         """
         return self._send_command("Robot/toManual", "")
 
-    def enter_manual_mode_via_auto(self) -> CommonResponse:
+    def EnterManualModeViaAuto(self) -> CommonResponse:
         """12.3 C# ``EnterManualModeViaAuto``：先 ``ToAuto`` 再 ``ToManual``。"""
-        self.to_auto()
-        return self.to_manual()
+        self.ToAuto()
+        return self.ToManual()
 
-    def to_auto(self) -> CommonResponse:
+    def ToAuto(self) -> CommonResponse:
         """
         12.4 进入自动模式 / Switch to auto mode.
 
@@ -954,7 +837,7 @@ class CodroidSession:
         """
         return self._send_command("Robot/toAuto", "")
 
-    def to_remote(self) -> CommonResponse:
+    def ToRemote(self) -> CommonResponse:
         """
         12.5 进入远程模式 / ``Robot/toRemote``（C# ``ToRemote``，不含前置 Auto）。
 
@@ -963,12 +846,12 @@ class CodroidSession:
         """
         return self._send_command("Robot/toRemote", "")
 
-    def enter_remote_mode_via_auto(self) -> CommonResponse:
+    def EnterRemoteModeViaAuto(self) -> CommonResponse:
         """12.5 C# ``EnterRemoteModeViaAuto``：先 ``ToAuto`` 再 ``ToRemote``。"""
-        self.to_auto()
-        return self.to_remote()
+        self.ToAuto()
+        return self.ToRemote()
 
-    def to_simulation(self) -> CommonResponse:
+    def ToSimulation(self) -> CommonResponse:
         """
         12.7 进入仿真模式 / Switch to simulation mode.
 
@@ -977,7 +860,7 @@ class CodroidSession:
         """
         return self._send_command("Robot/toSimulation", "")
 
-    def to_actual(self) -> CommonResponse:
+    def ToActual(self) -> CommonResponse:
         """
         12.8 进入实机模式 / Switch to actual mode.
 
@@ -986,7 +869,7 @@ class CodroidSession:
         """
         return self._send_command("Robot/toActual", "")
 
-    def start_drag(self) -> CommonResponse:
+    def StartDrag(self) -> CommonResponse:
         """
         12.9 进入拖拽模式 / Enable drag-and-teach mode.
         注意：只可在远程模式和手动模式下使用 / Note: Only available in remote or manual mode.
@@ -996,7 +879,7 @@ class CodroidSession:
         """
         return self._send_command("Robot/startDrag", "")
 
-    def stop_drag(self) -> CommonResponse:
+    def StopDrag(self) -> CommonResponse:
         """
         12.10 退出拖拽模式 / Disable drag-and-teach mode.
 
@@ -1005,7 +888,7 @@ class CodroidSession:
         """
         return self._send_command("Robot/stopDrag", "")
 
-    def clear_system_error(self) -> CommonResponse:
+    def ClearSystemError(self) -> CommonResponse:
         """
         12.11 清除错误 / Clear system errors（C# ``ClearSystemError``，协议 ``System/clearError``）。
 
@@ -1027,7 +910,7 @@ class CodroidSession:
 
     # --- 13.1 获取 IO 相关接口 / Get IO Interface ---
 
-    def get_io_values(self, io_requests: List[Dict[str, Any]]) -> CommonResponse:
+    def GetIoValues(self, io_requests: List[Dict[str, Any]]) -> CommonResponse:
         """
         13.1 获取多个 IO 的当前值 / Get multiple IO values.
         
@@ -1038,7 +921,7 @@ class CodroidSession:
             self._validate_io(req["type"], req["port"])
         return self._send_command("IOManager/GetIOValue", io_requests)
 
-    def get_di(self, port: int) -> int:
+    def GetDi(self, port: int) -> int:
         """
         获取数字输入 (DI) 值 / Get Digital Input value.
 
@@ -1048,13 +931,13 @@ class CodroidSession:
         Returns:
             int: 0 或 1 / 0 or 1.
         """
-        res = self.get_io_values([{"type": IOType.DI, "port": port}])
+        res = self.GetIoValues([{"type": IOType.DI, "port": port}])
         if res.db is not None and len(res.db) > 0:
             return int(res.db[0]["value"])
         
         raise CodroidError(f"无法获取 DI{port} 的值，响应数据为空 / Failed to get DI value.")
 
-    def get_do(self, port: int) -> int:
+    def GetDo(self, port: int) -> int:
         """
         获取数字输出 (DO) 值 / Get Digital Output value.
 
@@ -1064,13 +947,13 @@ class CodroidSession:
         Returns:
             int: 0 或 1 / 0 or 1.
         """
-        res = self.get_io_values([{"type": IOType.DO, "port": port}])
+        res = self.GetIoValues([{"type": IOType.DO, "port": port}])
         if res.db is not None and len(res.db) > 0:
             return int(res.db[0]["value"])
             
         raise CodroidError(f"无法获取 DO{port} 的值 / Failed to get DO value.")
 
-    def get_ai(self, port: int) -> float:
+    def GetAi(self, port: int) -> float:
         """
         获取模拟输入 (AI) 值 / Get Analog Input value.
 
@@ -1080,13 +963,13 @@ class CodroidSession:
         Returns:
             float: 模拟量值 / Analog value (double).
         """
-        res = self.get_io_values([{"type": IOType.AI, "port": port}])
+        res = self.GetIoValues([{"type": IOType.AI, "port": port}])
         if res.db is not None and len(res.db) > 0:
             return float(res.db[0]["value"])
             
         raise CodroidError(f"无法获取 AI{port} 的值 / Failed to get AI value.")
     
-    def get_ao(self, port: int) -> float:
+    def GetAo(self, port: int) -> float:
         """
         获取模拟输出 (AO) 值 / Get Analog Output value.
 
@@ -1096,7 +979,7 @@ class CodroidSession:
         Returns:
             float: 模拟量值 / Analog value (double).
         """
-        res = self.get_io_values([{"type": IOType.AO, "port": port}])
+        res = self.GetIoValues([{"type": IOType.AO, "port": port}])
         if res.db is not None and len(res.db) > 0:
             return float(res.db[0]["value"])
             
@@ -1104,7 +987,7 @@ class CodroidSession:
 
     # --- 13.2 写入 IO 相关接口 / Set IO Interface ---
 
-    def set_do(self, port: int, value: int) -> CommonResponse:
+    def SetDo(self, port: int, value: int) -> CommonResponse:
         """
         设置数字输出 (DO) 值 / Set Digital Output value.
 
@@ -1119,7 +1002,7 @@ class CodroidSession:
         db = {"type": IOType.DO, "port": port, "value": value}
         return self._send_command("IOManager/SetIOValue", db)
 
-    def set_ao(self, port: int, value: float) -> CommonResponse:
+    def SetAo(self, port: int, value: float) -> CommonResponse:
         """
         设置模拟输出 (AO) 值 / Set Analog Output value.
 
@@ -1131,7 +1014,7 @@ class CodroidSession:
         db = {"type": IOType.AO, "port": port, "value": value}
         return self._send_command("IOManager/SetIOValue", db)
 
-    def set_io_values(self, io_list: List[Dict[str, Any]]) -> List[CommonResponse]:
+    def SetIoValues(self, io_list: List[Dict[str, Any]]) -> List[CommonResponse]:
         """
         批量设置 IO 值 / Bulk set IO values.
         注：由于协议 13.2 是单点设置，此处通过循环调用实现。
@@ -1142,14 +1025,14 @@ class CodroidSession:
         results = []
         for item in io_list:
             if item["type"] in (IOType.DO, IOType.DI): # 协议通常只写 DO/AO
-                results.append(self.set_do(item["port"], item["value"]))
+                results.append(self.SetDo(item["port"], item["value"]))
             else:
-                results.append(self.set_ao(item["port"], item["value"]))
+                results.append(self.SetAo(item["port"], item["value"]))
         return results
 
     # --- 14. 寄存器相关接口 / Register Interface ---
 
-    def get_register_values(self, addresses: List[int]) -> CommonResponse:
+    def GetRegisterValues(self, addresses: List[int]) -> CommonResponse:
         """
         14.1 获取多个寄存器值 / Get multiple register values.
 
@@ -1161,7 +1044,7 @@ class CodroidSession:
         """
         return self._send_command("RegisterManager/GetRegisterValue", addresses)
 
-    def get_register(self, address: int) -> Any:
+    def GetRegisterValue(self, address: int) -> Any:
         """
         快捷方法：获取单个寄存器值 / Get a single register value.
 
@@ -1171,12 +1054,12 @@ class CodroidSession:
         Returns:
             Any: 寄存器的值 / The value of the register.
         """
-        res = self.get_register_values([address])
+        res = self.GetRegisterValues([address])
         if res.db is not None and len(res.db) > 0:
             return res.db[0]["value"]
         raise CodroidError(f"无法获取寄存器 {address} 的值 / Failed to get register value.")
 
-    def set_register_value(self, address: int, value: Any) -> CommonResponse:
+    def SetRegisterValue(self, address: int, value: Any) -> CommonResponse:
         """
         14.2 写入寄存器值 / Set a single register value.
 
@@ -1190,7 +1073,7 @@ class CodroidSession:
         db = {"address": address, "value": value}
         return self._send_command("RegisterManager/SetRegisterValue", db)
 
-    def set_extend_array_type(self, index: int, data_type: ExtendArrayType) -> CommonResponse:
+    def SetExtendArrayType(self, index: int, data_type: ExtendArrayType) -> CommonResponse:
         """
         14.3 设置扩展数组数据类型 / Set extended array data type.
 
@@ -1210,7 +1093,7 @@ class CodroidSession:
         }
         return self._send_command("RegisterManager/setExtendArrayType", db)
 
-    def remove_extend_array(self, index: int) -> CommonResponse:
+    def RemoveExtendArray(self, index: int) -> CommonResponse:
         """
         14.4 删除扩展数组索引 (重置数据) / Remove extended array index.
 
@@ -1227,7 +1110,7 @@ class CodroidSession:
 
     # --- 17. CRI 实时控制接口 / Codroid RealTime Interface ---
 
-    def start_cri_data_push(
+    def StartCriDataPush(
         self,
         ip: str,
         port: int,
@@ -1256,7 +1139,7 @@ class CodroidSession:
         }
         return self._send_command("CRI/StartDataPush", db)
 
-    def stop_cri_data_push(self, ip: Optional[str] = None, port: Optional[int] = None) -> CommonResponse:
+    def StopCriDataPush(self, ip: Optional[str] = None, port: Optional[int] = None) -> CommonResponse:
         """
         17.3/17.5 停止 CRI 推送 / Stop CRI data push（C# ``StopCriDataPush``）。
         """
@@ -1268,7 +1151,7 @@ class CodroidSession:
         finally:
             self._stop_cri_receiver()
 
-    def start_cri_control(
+    def StartCriControl(
         self,
         filter_type: CriFilterType = CriFilterType.NONE,
         duration: int = 1,
@@ -1289,83 +1172,191 @@ class CodroidSession:
         }
         return self._send_command("CRI/StartControl", db)
 
-    def stop_cri_control(self) -> CommonResponse:
+    def StopCriControl(self) -> CommonResponse:
         """17.7 关闭实时控制 / Stop CRI control（C# ``StopCriControl``）。"""
         return self._send_command("CRI/StopControl", "")
 
-    def connect_remote_and_switch_on(self) -> CommonResponse:
+    def ConnectRemoteAndSwitchOn(self) -> CommonResponse:
         """
         与 C# ``ConnectRemoteAndSwitchOn`` 一致：``EnterRemoteModeViaAuto`` → ``SwitchOn``。
-        须先 ``connect()`` / ``with`` 已建立 TCP。
+        须先 ``Connect()`` / ``with`` 已建立 TCP。
         """
-        self.enter_remote_mode_via_auto()
-        return self.switch_on()
-
-    # --- 历史别名（旧示例/脚本兼容；新代码请用 C# 对齐名）---
-    get_statues = get_cri_data
-    save_global_variables = save_global_vars
-    remove_global_variables = remove_global_vars
-    forward_kinematics = apos_to_cpos
-    inverse_kinematics = cpos_to_apos
-    jog = start_jog
-    pause_move = pause_robot_motion
-    resume_move = resume_robot_motion
-    stop_move = stop_robot_move
-    clear_error = clear_system_error
-    start_data_push = start_cri_data_push
-    stop_data_push = stop_cri_data_push
-    start_realtime_control = start_cri_control
-    stop_realtime_control = stop_cri_control
-    run = run_project
-    run_by_index = run_project_by_index
-    get_register_value = get_register
-    apos_to_cpos_pose = apos_to_cpos
-    cpos_to_apos_joints = cpos_to_apos
-    calculate_relative_pose_result = calculate_relative_pose
+        self.EnterRemoteModeViaAuto()
+        return self.SwitchOn()
 
     # --- 19. 机器人设置相关接口 / Robot Settings ---
 
-    def set_collision_sensitivity(self, sensitivity: int) -> CommonResponse:
-        """
-        19.1 设置碰撞检测灵敏度 / Set collision detection sensitivity.
-        仅 2.3.2.10 以上版本可用 / Only available in version 2.3.2.10+.
+    def _send_save_robot_parameter(self, db: Dict[str, Any]) -> CommonResponse:
+        return self._send_command("Robot/SaveRobotParameter", db)
 
-        Args:
-            sensitivity (int): 灵敏度 (0-100)，数值越大越灵敏 / Sensitivity value (0-100).
-
-        Returns:
-            CommonResponse: 响应对象 / Response object.
+    def SetCollisionSensitivity(self, sensitivity: int) -> CommonResponse:
         """
-        if not (0 <= sensitivity <= 100):
-            from .exceptions import CodroidError
-            raise CodroidError("灵敏度范围必须在 0~100 之间 / Sensitivity must be between 0 and 100.")
-            
+        19.1 设置碰撞检测灵敏度（``Robot/setCollisionSensitivity``，db 为 0~100 整数）。
+        仅固件 2.3.2.10+ 可用。
+        """
+        from .robot_settings import validate_collision_sensitivity
+
+        validate_collision_sensitivity(sensitivity)
         return self._send_command("Robot/setCollisionSensitivity", sensitivity)
 
-    def set_payload(self, payload_id: int) -> CommonResponse:
+    def SetPayload(self, payload_id: int) -> CommonResponse:
         """
-        19.2 设置负载 / Set robot payload.
-        仅 2.3.2.10 以上版本可用 / Only available in version 2.3.2.10+.
-
-        Args:
-            payload_id (int): 负载 ID (0-15) / Payload ID (0-15).
-
-        Returns:
-            CommonResponse: 响应对象 / Response object.
+        设置当前负载编号（``Robot/setPayload``，与 19.5 负载表不同）。
+        仅固件 2.3.2.10+ 可用。
         """
-        if not (0 <= payload_id <= 15):
-            from .exceptions import CodroidError
-            raise CodroidError("负载 ID 范围必须在 0~15 之间 / Payload ID must be between 0 and 15.")
-            
+        from .robot_settings import validate_default_slot_id
+
+        validate_default_slot_id(payload_id, "payload_id")
         return self._send_command("Robot/setPayload", payload_id)
+
+    def GetRobotParameters(self):
+        """
+        19.7 获取设置界面参数（``Robot/GetRobotParameter``）。
+        返回 ``RobotParameters`` 快照。
+        """
+        from .robot_settings import RobotParameters
+
+        response = self._send_command("Robot/GetRobotParameter", "")
+        return RobotParameters.from_db(response.db)
+
+    def SetDefaultPayloadId(self, payload_id: int) -> CommonResponse:
+        """19.2 仅设置默认负载编号（``Robot/SaveRobotParameter``）。"""
+        from .robot_settings import (
+            build_default_payload_id_db,
+            validate_default_slot_id,
+        )
+
+        validate_default_slot_id(payload_id, "payload_id")
+        return self._send_save_robot_parameter(build_default_payload_id_db(payload_id))
+
+    def SetDefaultToolId(self, tool_id: int) -> CommonResponse:
+        """19.3 仅设置默认工具坐标系编号。"""
+        from .robot_settings import build_default_tool_id_db, validate_default_slot_id
+
+        validate_default_slot_id(tool_id, "tool_id")
+        return self._send_save_robot_parameter(build_default_tool_id_db(tool_id))
+
+    def SetDefaultUserCoordinateId(self, coordinate_id: int) -> CommonResponse:
+        """19.6 仅设置默认用户坐标系编号（``defaultCoordinateId``，0~15）。"""
+        from .robot_settings import (
+            build_default_coordinate_id_db,
+            validate_default_slot_id,
+        )
+
+        validate_default_slot_id(coordinate_id, "coordinate_id")
+        return self._send_save_robot_parameter(
+            build_default_coordinate_id_db(coordinate_id)
+        )
+
+    def SaveToolFrames(self, frames) -> CommonResponse:
+        """19.4 下发完整工具坐标系表（16 项，id=0 须全零）。"""
+        from .robot_settings import build_tool_db, validate_tool_frames_for_save
+
+        validate_tool_frames_for_save(frames)
+        return self._send_save_robot_parameter(build_tool_db(frames))
+
+    def SetToolFrame(self, frame_id: int, frame) -> CommonResponse:
+        """
+        19.4 修改单个工具坐标系：先 ``GetRobotParameters``，再合并槽位后保存。
+        ``frame_id`` 仅允许 1~15。
+        """
+        from .robot_settings import (
+            RobotFrame,
+            build_tool_db,
+            merge_tool_frame,
+            validate_frame_id_matches,
+            validate_tool_frames_for_save,
+            validate_writable_frame_id,
+        )
+
+        if isinstance(frame, RobotFrame):
+            robot_frame = frame
+        elif isinstance(frame, dict):
+            robot_frame = RobotFrame.from_mapping(frame)
+        else:
+            raise CodroidError("frame 须为 RobotFrame 或 dict。")
+        validate_writable_frame_id(frame_id)
+        validate_frame_id_matches(frame_id, robot_frame)
+        current = self.GetRobotParameters()
+        merged = merge_tool_frame(current.tool, frame_id, robot_frame)
+        validate_tool_frames_for_save(merged)
+        return self._send_save_robot_parameter(build_tool_db(merged))
+
+    def SavePayloadFrames(self, frames) -> CommonResponse:
+        """19.5 下发完整负载坐标系表。"""
+        from .robot_settings import build_payload_db, validate_payload_frames_for_save
+
+        validate_payload_frames_for_save(frames)
+        return self._send_save_robot_parameter(build_payload_db(frames))
+
+    def SetPayloadFrame(self, frame_id: int, frame) -> CommonResponse:
+        """
+        19.5 修改单个负载坐标系：先读后改再 ``SaveRobotParameter``。
+        ``frame_id`` 仅允许 1~15。
+        """
+        from .robot_settings import (
+            RobotPayloadFrame,
+            build_payload_db,
+            merge_payload_frame,
+            validate_payload_frame_id_matches,
+            validate_payload_frames_for_save,
+            validate_writable_frame_id,
+        )
+
+        if isinstance(frame, RobotPayloadFrame):
+            payload_frame = frame
+        elif isinstance(frame, dict):
+            payload_frame = RobotPayloadFrame.from_mapping(frame)
+        else:
+            raise CodroidError("frame 须为 RobotPayloadFrame 或 dict。")
+        validate_writable_frame_id(frame_id)
+        validate_payload_frame_id_matches(frame_id, payload_frame)
+        current = self.GetRobotParameters()
+        merged = merge_payload_frame(current.payload, frame_id, payload_frame)
+        validate_payload_frames_for_save(merged)
+        return self._send_save_robot_parameter(build_payload_db(merged))
+
+    def SaveUserCoordinateFrames(self, frames) -> CommonResponse:
+        """19.6 下发完整用户坐标系表。"""
+        from .robot_settings import build_coordinate_db, validate_tool_frames_for_save
+
+        validate_tool_frames_for_save(frames)
+        return self._send_save_robot_parameter(build_coordinate_db(frames))
+
+    def SetUserCoordinateFrame(self, frame_id: int, frame) -> CommonResponse:
+        """
+        19.6 修改单个用户坐标系：先读后改。
+        ``frame_id`` 仅允许 1~15。
+        """
+        from .robot_settings import (
+            RobotFrame,
+            build_coordinate_db,
+            merge_coordinate_frame,
+            validate_frame_id_matches,
+            validate_tool_frames_for_save,
+            validate_writable_frame_id,
+        )
+
+        if isinstance(frame, RobotFrame):
+            coord_frame = frame
+        elif isinstance(frame, dict):
+            coord_frame = RobotFrame.from_mapping(frame)
+        else:
+            raise CodroidError("frame 须为 RobotFrame 或 dict。")
+        validate_writable_frame_id(frame_id)
+        validate_frame_id_matches(frame_id, coord_frame)
+        current = self.GetRobotParameters()
+        merged = merge_coordinate_frame(current.coordinate, frame_id, coord_frame)
+        validate_tool_frames_for_save(merged)
+        return self._send_save_robot_parameter(build_coordinate_db(merged))
 
     # 支持 with 语句
     def __enter__(self):
-        self._net.connect()
+        self.Connect()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
+        self.Disconnect()
 
 
 CodroidControlInterface = CodroidSession
