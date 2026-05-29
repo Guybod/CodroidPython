@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-示例 07 — MoveTo（RunTo）与心跳
+示例 07 — MoveTo（RunTo）与心跳 + StopMoveTo
 
 【目的】
   演示 ``Robot/moveTo`` 三类场景：回 Home、关节规划、直线规划。
   MoveTo 与 Robot/move 不同：启动后须周期 ``MoveToHeartbeat``（约 500ms）。
+  演示 ``StopMoveTo`` 中途停止 MoveTo 运动。
 
 【前置条件】
   - 已使能；Home/安全位等已在示教器配置
@@ -13,6 +14,7 @@
 【涉及协议】
   - Robot/moveTo：db.type + 可选 db.target（jp 或 cp）
   - Robot/moveToHeartbeat
+  - StopMoveTo：发送 type=-1 停止 MoveTo
 
 【运行】
   PYTHONPATH=src python examples/07_move_to.py --robot <IP>
@@ -99,6 +101,19 @@ def main(argv: list[str]) -> int:
             time.sleep(4)
             stop_event.set()
             t.join(timeout=2.0)
+
+            # --- 场景 4：StopMoveTo 中途停止 ---
+            PrintBanner("Scene 4 — StopMoveTo", subtitle="启动后 2 秒停止")
+            robot.MoveTo(MoveToType.LINEAR, target=target_pose)
+            stop_event.clear()
+            t = threading.Thread(target=heartbeat_worker, args=(robot, stop_event))
+            t.start()
+            time.sleep(2)
+            print("  调用 StopMoveTo() / Calling StopMoveTo()...")
+            robot.StopMoveTo()
+            stop_event.set()
+            t.join(timeout=2.0)
+            print("  ✓ MoveTo 已停止")
 
         PrintBanner("07 — Done", subtitle="所有场景结束")
     except KeyboardInterrupt:

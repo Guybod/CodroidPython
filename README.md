@@ -75,6 +75,10 @@ python3 demo.py
 | `MovJ(target, speed, acceleration)` | 目标：`JointPoint` 或 `CartesianPoint` |
 | `MovL(target, speed, acceleration)` | 目标：`CartesianPoint` 或 `JointPoint` |
 | `Move([MoveInstruction.MovJ(...), ...])` | 多段路径 |
+| `MovJSync(target, speed, acc, wait?)` | 阻塞式关节运动，等待到达目标 |
+| `MovLSync(target, speed, acc, wait?)` | 阻塞式直线运动，等待到达目标 |
+| `MovCSync(middle, target, speed, acc, wait?)` | 阻塞式圆弧运动 |
+| `MoveSync(instructions, wait?)` | 阻塞式路径执行 |
 
 四组合路径示例（与 C++ `04_move` 一致）：
 
@@ -99,6 +103,29 @@ robot.Move(path)
 ```
 
 打包规则：`jp` 优先；仅 `cp` 时若未提供 `rj`，JSON 中带默认 `[20,20,20,20,20,20]`（度）。
+
+### 阻塞式运动 API
+
+`*Sync` 方法发送运动指令后自动轮询 CRI 数据，直到机器人稳定到达目标。需要先启动 CRI 数据推送（`StartListenUdp`）。
+
+```python
+from codroid import CodroidClient, JointPoint, MotionWaitOptions
+
+with CodroidClient(host="192.168.1.136") as robot:
+    robot.ConnectRemoteAndSwitchOn()
+    robot.StartListenUdp()
+    robot.WaitForCriData()  # 等待第一个 CRI 包到达
+
+    # 阻塞式关节运动，使用默认等待参数
+    robot.MovJSync(JointPoint.Degrees([0, 0, 90, 0, 90, 0]), speed=40, acceleration=100)
+
+    # 自定义等待参数
+    opts = MotionWaitOptions(timeout=30.0, joint_tolerance_deg=0.5)
+    robot.MovLSync(CartesianPoint.MmDeg([400, 200, 500, 180, 0, 90]),
+                   speed=150, acceleration=500, wait=opts)
+```
+
+`MotionWaitOptions` 可调整超时、轮询间隔、到达容差等参数。
 
 **Breaking（2.1.1）**：公开 API 与 C# 一致，统一 **PascalCase**（`Connect`、`SwitchOn`、`GetDi`、`MovJ`、`SetToolFrame` 等）；`CriData` 为属性；`move_j` / `switch_on` 等 snake_case 已移除。见 [CHANGELOG.md](CHANGELOG.md)。
 
@@ -132,6 +159,7 @@ with CodroidClient(host="192.168.1.136") as robot:
 
 ```bash
 PYTHONPATH=src python examples/08_move.py --robot 192.168.8.136
+PYTHONPATH=src python examples/15_sync_motion.py --robot 192.168.8.136
 PYTHONPATH=src python examples/14_robot_parameters.py --robot 192.168.8.136
 PYTHONPATH=src python examples/codroid_test.py motion
 PYTHONPATH=src python examples/codroid_test.py s20

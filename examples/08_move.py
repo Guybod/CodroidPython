@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-示例 08 — 类型化运动 API（MovJ / MovL / Move 四组合）
+示例 08 — 类型化运动 API（MovJ / MovL / Move 四组合 + Sync 阻塞运动）
 
 【目的】
   对齐 C++ ``examples_client/04_move.cpp``，演示「运动方式 × 点位类型」四种合法组合：
@@ -13,7 +13,8 @@
   | MovL             | JointPoint       | movL + jp  |
   | MovC             | CartesianPoint×2 | movC 中间点+终点 |
 
-  流程：先逐条单点下发（含 ``MovC``），再一次 ``Move(path)`` 下发多段（末段为圆弧）。
+  流程：先逐条单点下发（含 ``MovC``），再一次 ``Move(path)`` 下发多段（末段为圆弧），
+  最后演示 ``MovJSync`` / ``MovLSync`` 阻塞式运动。
 
 【前置条件】
   - 已使能；CRI 推送正常（movJ→TCP 建议 ``MmDegWithRef``）
@@ -27,6 +28,7 @@
   - ``MovL(JointPoint)``：直线到关节目标（非 TCP 直线），协议仍带 ``jp``
   - 仅 ``cp`` 且无 ``rj`` 时，打包默认 ``rj=[20,…,20]``（度）
   - ``MovC`` 仅接受两个 ``CartesianPoint``（中间点、终点），与 C++ ``04_move.cpp`` 圆弧常量一致
+  - ``*Sync`` 方法需先启动 CRI 推送（``StartListenUdp``），发送后自动等待到达
 """
 from __future__ import annotations
 
@@ -42,6 +44,7 @@ from codroid import (
     InitConsoleUtf8,
     JointPoint,
     MoveInstruction,
+    MotionWaitOptions,
     PrintBanner,
 )
 
@@ -154,7 +157,23 @@ def main(argv: list[str]) -> int:
             robot.Move(path)
             wait_idle(robot)
 
-            PrintBanner("08 — 完成", subtitle="四组合 + MovC 单点与路径")
+            # -----------------------------------------------------------------
+            # 三、阻塞式运动（*Sync）— 发送后自动等待 CRI 确认到达
+            # -----------------------------------------------------------------
+            print("\n[7] MovJSync + JointPoint  (阻塞式关节运动)")
+            robot.MovJSync(joint_pose, speed=40, acceleration=100)
+            print("  ✓ 到达目标")
+
+            print("\n[8] MovLSync + CartesianPoint  (阻塞式直线运动)")
+            robot.MovLSync(line_p1, speed=150, acceleration=500)
+            print("  ✓ 到达目标")
+
+            print("\n[9] MovJSync + 自定义 MotionWaitOptions")
+            opts = MotionWaitOptions(timeout=30.0, joint_tolerance_deg=0.5)
+            robot.MovJSync(joint_home, speed=40, acceleration=100, wait=opts)
+            print("  ✓ 到达目标")
+
+            PrintBanner("08 — 完成", subtitle="四组合 + MovC + Sync 阻塞运动")
             time.sleep(1)
     except KeyboardInterrupt:
         return 130

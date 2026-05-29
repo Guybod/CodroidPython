@@ -10,7 +10,7 @@ import socket
 import time
 from typing import Any, Dict, List, Literal, Optional, Union, Sequence, cast
 from .async_tcp_client import JsonStreamClient
-from .exceptions import CodroidError
+from .exceptions import CodroidError, CodroidTimeoutError
 from .define import *
 from .utils import is_valid_variable_name
 from .cri_realtime_packet_parser import CriRealtimePacketParser, CriStreamHandler
@@ -42,6 +42,7 @@ class CodroidSession:
         self.cri_cache: Optional[CriRealTimeData] = None  # 实时数据缓存
         self._cri_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
+        self._last_cri_received_utc: float = 0.0  # time.monotonic() of last CRI packet
 
     def _send_command(self, ty: str, db: Any = None) -> CommonResponse:
         """
@@ -146,6 +147,7 @@ class CodroidSession:
                             print(f"跳过非 308 字节 CRI 包: {len(data)} 字节")
                         continue
                     self.cri_cache = parsed
+                    self._last_cri_received_utc = time.monotonic()
                 except socket.timeout:
                     continue
                 except Exception as e:
@@ -174,6 +176,32 @@ class CodroidSession:
         """最新 CRI 快照（C# ``CriData``，内部 ``cri_cache``）。"""
         return self.cri_cache
 
+    def WaitForCriData(self, timeout: float = 5.0) -> CriRealTimeData:
+        """
+        等待第一个 CRI 数据包到达 / Wait for the first CRI packet.
+
+        调用 ``*Sync`` 阻塞运动方法前，需确保 CRI 数据已开始推送。
+        本方法阻塞直到收到第一个 CRI 包或超时。
+
+        Args:
+            timeout: 最大等待秒数，默认 5.0。
+
+        Returns:
+            CriRealTimeData: 首个 CRI 快照。
+
+        Raises:
+            CodroidTimeoutError: 超时未收到 CRI 数据。
+        """
+        start = time.monotonic()
+        while (time.monotonic() - start) < timeout:
+            if self.cri_cache is not None:
+                return self.cri_cache
+            time.sleep(0.05)
+        raise CodroidTimeoutError(
+            f"WaitForCriData timed out ({timeout:.1f}s). "
+            "Ensure StartListenUdp / StartCriDataPush is called first."
+        )
+
     def StartListenUdp(self): 
         try:            
             # 1. 先停止旧的推送
@@ -196,26 +224,42 @@ class CodroidSession:
 
     # --- 接口实现 ---
 
-    def RunScript(self, main_script: str, vars: Optional[Dict[str, Any]] = None) -> CommonResponse:
+    def RunScript(
+        self,
+        main_script: str,
+        sub_threads: Optional[Dict[str, str]] = None,
+        sub_programs: Optional[Dict[str, str]] = None,
+        interrupts: Optional[Dict[str, str]] = None,
+        vars: Optional[Dict[str, Any]] = None,
+    ) -> CommonResponse:
         """
         2.1 运行脚本 / Run script（C# ``RunScript``）。
 
         Args:
             main_script (str): Lua 脚本代码 / Lua script code.
-            vars: 脚本共享变量 / Shared variables for the script.
+            sub_threads (dict, optional): 子线程脚本 ``{name: lua_code}``。
+            sub_programs (dict, optional): 子程序脚本 ``{name: lua_code}``。
+            interrupts (dict, optional): 中断处理脚本 ``{name: lua_code}``。
+            vars (dict, optional): 脚本共享变量 / Shared variables for the script.
 
         Returns:
             CommonResponse: 响应对象 / Response object.
         """
-        db = {
-            "scripts": {"main": main_script},
-            "vars": vars or {}
-        }
+        scripts: Dict[str, Any] = {"main": main_script}
+        if sub_threads:
+            scripts["subThreads"] = sub_threads
+        if sub_programs:
+            scripts["subPrograms"] = sub_programs
+        if interrupts:
+            scripts["interrupts"] = interrupts
+        db: Dict[str, Any] = {"scripts": scripts}
+        if vars:
+            db["vars"] = vars
         return self._send_command("project/runScript", db)
 
     def __run_script(self, main_script: str, vars: Optional[Dict[str, Any]] = None) -> CommonResponse:
         """兼容旧代码调用 ``__run_script``。"""
-        return self.RunScript(main_script, vars)
+        return self.RunScript(main_script, vars=vars)
 
     def EnterRemoteScriptMode(self) -> CommonResponse:
         """
@@ -602,6 +646,17 @@ class CodroidSession:
         """11.5 moveTo 心跳（C# ``MoveToHeartbeat``）。"""
         return self._send_command("Robot/moveToHeartbeat")
 
+    def StopMoveTo(self) -> CommonResponse:
+        """
+        11.5b 停止 MoveTo 运动 / Stop MoveTo motion（C# ``StopMoveTo``）。
+
+        发送 ``type=-1`` 停止当前 MoveTo 运动。
+
+        Returns:
+            CommonResponse: 响应对象 / Response object.
+        """
+        return self._send_command("Robot/moveTo", {"type": MoveToType.STOP})
+
     def SetManualMoveRate(self, rate: int) -> CommonResponse:
         """
         11.6 设置手动运动倍率 / Set manual move rate.
@@ -793,6 +848,284 @@ class CodroidSession:
     def StopRobotMove(self) -> CommonResponse:
         """11.11 停止运动 / Stop robot move（C# ``StopRobotMove``）。"""
         return self._send_command("Robot/stopMove", "")
+
+    # --- 11b. 阻塞式运动接口 / Synchronous (Blocking) Motion ---
+
+    @staticmethod
+    def _max_abs_diff(actual: List[float], expected: List[float]) -> float:
+        """六轴最大绝对误差 / Max absolute joint error across 6 axes."""
+        if len(actual) < 6 or len(expected) < 6:
+            return float("inf")
+        return max(abs(actual[i] - expected[i]) for i in range(6))
+
+    @staticmethod
+    def _euclidean_3mm(actual_pose: List[float], target_pose: List[float]) -> float:
+        """笛卡尔位置欧氏距离（mm）/ Euclidean distance of xyz (mm)."""
+        if len(actual_pose) < 3 or len(target_pose) < 3:
+            return float("inf")
+        dx = actual_pose[0] - target_pose[0]
+        dy = actual_pose[1] - target_pose[1]
+        dz = actual_pose[2] - target_pose[2]
+        return (dx * dx + dy * dy + dz * dz) ** 0.5
+
+    @staticmethod
+    def _max_abs_euler_diff_deg(actual_pose: List[float], target_pose: List[float]) -> float:
+        """笛卡尔姿态最大欧拉角误差（度）/ Max absolute Euler angle error (deg)."""
+        if len(actual_pose) < 6 or len(target_pose) < 6:
+            return float("inf")
+        return max(abs(actual_pose[i] - target_pose[i]) for i in range(3, 6))
+
+    @staticmethod
+    def _is_cartesian_target_reached(
+        actual_pose: List[float], target_pose: List[float], options: "MotionWaitOptions"
+    ) -> bool:
+        """笛卡尔目标到达判定（位置 + 姿态）/ Cartesian target-reached check."""
+        pos_err = CodroidSession._euclidean_3mm(actual_pose, target_pose)
+        ori_err = CodroidSession._max_abs_euler_diff_deg(actual_pose, target_pose)
+        return (pos_err <= options.cartesian_position_tolerance_mm
+                and ori_err <= options.cartesian_orientation_tolerance_deg)
+
+    def _ensure_cri_fresh(self, options: "MotionWaitOptions", op_name: str) -> None:
+        """检查 CRI 数据是否新鲜 / Ensure CRI data is not stale."""
+        last = self._last_cri_received_utc
+        if last <= 0:
+            raise CodroidError(
+                f"{op_name} wait failed: CRI data not yet received. "
+                "Call StartListenUdp / StartCriDataPush first."
+            )
+        age = time.monotonic() - last
+        if age > options.cri_stale_timeout:
+            raise CodroidTimeoutError(
+                f"{op_name} wait failed: CRI data stale {age * 1000:.0f}ms, "
+                f"threshold {options.cri_stale_timeout * 1000:.0f}ms."
+            )
+
+    def _build_move_target_reached_predicate(
+        self, instructions: List[Dict[str, Any]], options: "MotionWaitOptions"
+    ):
+        """根据最后一条指令的目标类型构建到达判定谓词 / Build target-reached predicate from last instruction."""
+        if not instructions:
+            raise CodroidError("At least one instruction required.")
+        from .robot_motion import pack_move_point, DEFAULT_RJ
+        last = instructions[-1]
+        tp = last.get("targetPoint", {})
+        jp = tp.get("jp")
+        cp = tp.get("cp")
+        if jp is not None and len(jp) >= 6:
+            return lambda data: self._max_abs_diff(data.joint_position, jp) <= options.joint_tolerance_deg
+        if cp is not None and len(cp) >= 6:
+            return lambda data: self._is_cartesian_target_reached(
+                data.tcp_pose, cp, options)
+        return lambda data: True
+
+    def _wait_until_settled_by_cri(
+        self,
+        target_reached,
+        op_name: str,
+        options: "MotionWaitOptions",
+    ) -> None:
+        """轮询 CRI 数据直到机器人稳定到达目标 / Poll CRI until robot settles at target."""
+        if options.settled_samples <= 0:
+            raise CodroidError("MotionWaitOptions.settled_samples must be > 0.")
+        if options.poll_interval <= 0:
+            raise CodroidError("MotionWaitOptions.poll_interval must be > 0.")
+
+        start = time.monotonic()
+        settled = 0
+        had_motion = False
+
+        while (time.monotonic() - start) <= options.timeout:
+            self._ensure_cri_fresh(options, op_name)
+            snapshot = self.CriData
+            if snapshot is None:
+                time.sleep(options.poll_interval)
+                continue
+
+            reached = target_reached(snapshot)
+
+            if snapshot.status.is_moving:
+                had_motion = True
+
+            if snapshot.status.collision_stop or snapshot.status.is_emergency_stop or snapshot.status.has_alarm:
+                raise CodroidError(
+                    f"{op_name} failed: abnormal state detected "
+                    f"(CollisionStopped={snapshot.status.collision_stop}, "
+                    f"EmergencyStopPressed={snapshot.status.is_emergency_stop}, "
+                    f"HasAlarm={snapshot.status.has_alarm})."
+                )
+
+            if had_motion and not snapshot.status.is_moving and not reached:
+                raise CodroidError(
+                    f"{op_name} failed: motion stopped but target not reached."
+                )
+
+            still = not snapshot.status.is_moving
+            if reached and still:
+                settled += 1
+                if settled >= options.settled_samples:
+                    return
+            else:
+                settled = 0
+
+            time.sleep(options.poll_interval)
+
+        tail = self.CriData
+        jp_str = ", ".join(f"{v:.3f}" for v in (tail.joint_position if tail else []))
+        raise CodroidTimeoutError(
+            f"{op_name} wait timed out ({options.timeout:.1f}s). "
+            f"Last state: InMotion={tail.status.is_moving if tail else '?'}, "
+            f"jp=[{jp_str}]"
+        )
+
+    def MoveSync(
+        self,
+        path: Union[MotionPath, List[MoveInstruction], List[Dict[str, Any]]],
+        wait: Optional[MotionWaitOptions] = None,
+    ) -> bool:
+        """
+        阻塞式路径执行，等待 CRI 确认最后一段到达目标 / Blocking path execution.
+
+        Args:
+            path: 运动路径（MotionPath / List[MoveInstruction] / List[Dict]）。
+            wait: 等待参数，None 使用默认值。
+
+        Returns:
+            bool: 到达目标返回 True。
+        """
+        options = wait or MotionWaitOptions()
+        self.Move(path)
+        if isinstance(path, MotionPath):
+            cmds = path.get_commands()
+        elif isinstance(path, list) and path and isinstance(path[0], MoveInstruction):
+            cmds = [inst.to_dict() for inst in cast(List[MoveInstruction], path)]
+        else:
+            cmds = cast(List[Dict[str, Any]], path)
+        predicate = self._build_move_target_reached_predicate(cmds, options)
+        self._wait_until_settled_by_cri(predicate, "MoveSync", options)
+        return True
+
+    def MovJSync(
+        self,
+        target: Union[JointPoint, CartesianPoint],
+        speed: float, acceleration: float,
+        wait: Optional[MotionWaitOptions] = None,
+        blend: float = 0.0,
+        coor: Optional[Sequence[float]] = None,
+        tool: Optional[Sequence[float]] = None,
+    ) -> bool:
+        """
+        阻塞式关节运动 / Blocking joint moveJ.
+
+        Args:
+            target: JointPoint 或 CartesianPoint 目标。
+            speed: 速度。
+            acceleration: 加速度。
+            wait: 等待参数，None 使用默认值。
+            blend: 平滑半径。
+            coor: 用户坐标系。
+            tool: 工具坐标系。
+
+        Returns:
+            bool: 到达目标返回 True。
+        """
+        options = wait or MotionWaitOptions()
+        self.MovJ(target, speed, acceleration, blend=blend, coor=coor, tool=tool)
+        if isinstance(target, JointPoint):
+            predicate = (lambda jp: lambda data:
+                self._max_abs_diff(data.joint_position, jp) <= options.joint_tolerance_deg
+            )(list(target.jp))
+        else:
+            predicate = (lambda cp: lambda data:
+                self._is_cartesian_target_reached(data.tcp_pose, cp, options)
+            )(list(target.cp))
+        self._wait_until_settled_by_cri(predicate, "MovJSync", options)
+        return True
+
+    def MovLSync(
+        self,
+        target: Union[CartesianPoint, JointPoint],
+        speed: float, acceleration: float,
+        wait: Optional[MotionWaitOptions] = None,
+        blend: float = 0.0,
+        coor: Optional[Sequence[float]] = None,
+        tool: Optional[Sequence[float]] = None,
+    ) -> bool:
+        """
+        阻塞式直线运动 / Blocking linear moveL.
+
+        Args:
+            target: CartesianPoint 或 JointPoint 目标。
+            speed: 速度。
+            acceleration: 加速度。
+            wait: 等待参数，None 使用默认值。
+            blend: 平滑半径。
+            coor: 用户坐标系。
+            tool: 工具坐标系。
+
+        Returns:
+            bool: 到达目标返回 True。
+        """
+        options = wait or MotionWaitOptions()
+        self.MovL(target, speed, acceleration, blend=blend, coor=coor, tool=tool)
+        if isinstance(target, JointPoint):
+            predicate = (lambda jp: lambda data:
+                self._max_abs_diff(data.joint_position, jp) <= options.joint_tolerance_deg
+            )(list(target.jp))
+        else:
+            predicate = (lambda cp: lambda data:
+                self._is_cartesian_target_reached(data.tcp_pose, cp, options)
+            )(list(target.cp))
+        self._wait_until_settled_by_cri(predicate, "MovLSync", options)
+        return True
+
+    def MovCSync(
+        self,
+        middle: CartesianPoint,
+        target: CartesianPoint,
+        speed: float, acceleration: float,
+        wait: Optional[MotionWaitOptions] = None,
+        blend: float = 0.0,
+        coor: Optional[Sequence[float]] = None,
+        tool: Optional[Sequence[float]] = None,
+    ) -> bool:
+        """
+        阻塞式圆弧运动 / Blocking arc moveC.
+
+        Returns:
+            bool: 到达目标返回 True。
+        """
+        options = wait or MotionWaitOptions()
+        self.MovC(middle, target, speed, acceleration, blend=blend, coor=coor, tool=tool)
+        inst = MoveInstruction.MovC(middle, target, speed, acceleration, blend=blend, coor=coor, tool=tool)
+        cmds = [inst.to_dict()]
+        predicate = self._build_move_target_reached_predicate(cmds, options)
+        self._wait_until_settled_by_cri(predicate, "MovCSync", options)
+        return True
+
+    def MovCircleSync(
+        self,
+        middle: CartesianPoint,
+        target: CartesianPoint,
+        circle_num: int,
+        speed: float, acceleration: float,
+        wait: Optional[MotionWaitOptions] = None,
+        blend: float = 0.0,
+        coor: Optional[Sequence[float]] = None,
+        tool: Optional[Sequence[float]] = None,
+    ) -> bool:
+        """
+        阻塞式整圆运动 / Blocking full-circle moveCircle.
+
+        Returns:
+            bool: 到达目标返回 True。
+        """
+        options = wait or MotionWaitOptions()
+        self.MovCircle(middle, target, circle_num, speed, acceleration, blend=blend, coor=coor, tool=tool)
+        inst = MoveInstruction.MovCircle(middle, target, circle_num, speed, acceleration, blend=blend, coor=coor, tool=tool)
+        cmds = [inst.to_dict()]
+        predicate = self._build_move_target_reached_predicate(cmds, options)
+        self._wait_until_settled_by_cri(predicate, "MovCircleSync", options)
+        return True
 
     # --- 12. 机器人控制命令 / Robot Control Commands ---
 

@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.1.2 — 阻塞式运动 API / RunScript 完整参数 / StopMoveTo
+
+### Added
+
+- **阻塞式运动 API**（对齐 C# `*Sync` 方法）：
+  - `MoveSync`、`MovJSync`、`MovLSync`、`MovCSync`、`MovCircleSync`
+  - `MotionWaitOptions`：可配置超时、轮询间隔、CRI 过期判定、稳定采样数、关节/笛卡尔容差
+  - 内部 CRI 新鲜度追踪（`_last_cri_received_utc`）
+- **`RunScript` 完整参数**：新增 `sub_threads`、`sub_programs`、`interrupts` 可选字典参数（对齐 C# `RunScript(main, subThreads, subPrograms, interrupts, vars)`）
+- **`StopMoveTo()`**：发送 `type=-1` 停止 MoveTo 运动
+- `MoveToType.STOP = -1` 枚举值
+- 更新示例：`08_move.py` 增加 Sync 阻塞运动演示；`02_run_script.py` 增加子线程/子程序/中断演示；`07_move_to.py` 增加 StopMoveTo 演示
+
 ## 2.1.1 — 机器人设置 API（协议 19.x）
 
 ### Added

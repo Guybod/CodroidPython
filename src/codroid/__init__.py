@@ -62,6 +62,7 @@ __all__ = [
     "MovePoint",
     "MoveInstruction",
     "MotionPath",
+    "MotionWaitOptions",
     "IOType",
     "ExtendArrayType",
     "CRIStreamHandler",
