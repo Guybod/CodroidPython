@@ -6,7 +6,6 @@ build_msvc/
 bin/
 lib/
 out/
-docs/
 up.md
 
 # === 编译器产生的中间文件 (Objects & Libraries) ===
@@ -72,8 +71,8 @@ dist/
 build/
 *.egg-info/
 
-# 文档输出
-site/
+# 文档输出（mkdocs 已移除，site/ 不再生成）
+# site/
 
 # IDE 设置
 .vscode/

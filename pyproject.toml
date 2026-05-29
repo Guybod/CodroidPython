@@ -68,20 +68,5 @@ exclude_lines = [
   "if TYPE_CHECKING:",
 ]
 
-# 定义一个专门用于文档的环境
-[tool.hatch.envs.docs]
-detached = true  # 增加这一行，表示这是一个独立的、不依赖主环境的环境
-dependencies = [
-  "mkdocs-material>=9.0",
-  "mkdocstrings[python]>=0.11.0",
-  "ghp-import",
-]
-
-# 定义快捷命令
-[tool.hatch.envs.docs.scripts]
-serve = "mkdocs serve"
-build = "mkdocs build"
-deploy = "mkdocs gh-deploy --force"
-
 [tool.hatch.build.targets.wheel]
 packages = ["src/codroid"]
