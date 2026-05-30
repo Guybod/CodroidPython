@@ -58,6 +58,12 @@ def main(argv: list[str]) -> int:
             robot.EnterRemoteModeViaAuto()
             robot.SwitchOn()
 
+            # 先停止可能残留的 CRI 推送（多客户端会报错）
+            try:
+                robot.StopCriDataPush(ip=args.local_ip, port=args.udp_port)
+            except Exception:
+                pass
+
             # 必须启动 CRI 数据推送，*Sync 方法依赖 CRI 判断到达
             robot.StartListenUdp()
             print("等待 CRI 数据... / Waiting for CRI data...")
@@ -82,21 +88,18 @@ def main(argv: list[str]) -> int:
             # 3. MovJSync + CartesianPoint — 关节插补到 TCP
             # -----------------------------------------------------------------
             PrintBanner("[3] MovJSync + CartesianPoint")
-            cart_ref = CartesianPoint.MmDegWithRef(
-                [927.516, 214.489, 900.0, 180.0, 0.0, -89.999],
-                list(robot.CriData.joint_position) if robot.CriData else [0] * 6,
-            )
+            cart_ref = CartesianPoint.MmDeg([927.516, 214.489, 800.0, 180.0, 0.0, -89.999])
             robot.MovJSync(cart_ref, speed=40, acceleration=100)
             print("  ✓ 到达目标\n")
 
             # -----------------------------------------------------------------
             # 4. MovCSync — 阻塞式圆弧运动
             # -----------------------------------------------------------------
-            PrintBanner("[4] MovCSync")
-            middle = CartesianPoint.MmDeg([927.515, 27.23, 738.722, -180.0, 0.0, -89.999])
-            end = CartesianPoint.MmDeg([927.511, 214.489, 486.524, 179.999, 0.0, -89.999])
-            robot.MovCSync(middle, end, speed=120, acceleration=400)
-            print("  ✓ 到达目标\n")
+            # PrintBanner("[4] MovCSync")
+            # middle = CartesianPoint.MmDeg([927.515, 27.23, 738.722, -180.0, 0.0, -89.999])
+            # end = CartesianPoint.MmDeg([927.511, 214.489, 486.524, 179.999, 0.0, -89.999])
+            # robot.MovCSync(middle, end, speed=120, acceleration=400)
+            # print("  ✓ 到达目标\n")
 
             # -----------------------------------------------------------------
             # 5. MoveSync — 阻塞式多段路径
@@ -105,7 +108,7 @@ def main(argv: list[str]) -> int:
             path = [
                 MoveInstruction.MovJ(joint_pose, speed=40, acc=100),
                 MoveInstruction.MovL(cart_p1, speed=150, acc=500, blend=25),
-                MoveInstruction.MovL(joint_home, speed=150, acc=500, blend=25),
+                MoveInstruction.MovJ(joint_home, speed=150, acc=500, blend=25),
             ]
             robot.MoveSync(path)
             print("  ✓ 全部到达\n")

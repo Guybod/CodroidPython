@@ -873,7 +873,10 @@ class CodroidSession:
         """笛卡尔姿态最大欧拉角误差（度）/ Max absolute Euler angle error (deg)."""
         if len(actual_pose) < 6 or len(target_pose) < 6:
             return float("inf")
-        return max(abs(actual_pose[i] - target_pose[i]) for i in range(3, 6))
+        def _angle_diff(a: float, b: float) -> float:
+            d = (a - b) % 360
+            return min(d, 360 - d)
+        return max(_angle_diff(actual_pose[i], target_pose[i]) for i in range(3, 6))
 
     @staticmethod
     def _is_cartesian_target_reached(
