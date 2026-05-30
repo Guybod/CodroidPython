@@ -723,7 +723,7 @@ class CodroidSession:
         target: Union[JointPoint, CartesianPoint, MovePoint],
         speed: float,
         acceleration: float,
-        blend: float = 0.0,
+        blend: Optional[float] = None,
         coor: Optional[Sequence[float]] = None,
         tool: Optional[Sequence[float]] = None,
     ) -> CommonResponse:
@@ -759,7 +759,7 @@ class CodroidSession:
         target: Union[CartesianPoint, JointPoint, MovePoint],
         speed: float,
         acceleration: float,
-        blend: float = 0.0,
+        blend: Optional[float] = None,
         coor: Optional[Sequence[float]] = None,
         tool: Optional[Sequence[float]] = None,
     ) -> CommonResponse:
@@ -795,7 +795,7 @@ class CodroidSession:
         target: CartesianPoint,
         speed: float,
         acceleration: float,
-        blend: float = 0.0,
+        blend: Optional[float] = None,
         coor: Optional[Sequence[float]] = None,
         tool: Optional[Sequence[float]] = None,
     ) -> CommonResponse:
@@ -818,7 +818,7 @@ class CodroidSession:
         circle_num: int,
         speed: float,
         acceleration: float,
-        blend: float = 0.0,
+        blend: Optional[float] = None,
         coor: Optional[Sequence[float]] = None,
         tool: Optional[Sequence[float]] = None,
     ) -> CommonResponse:
@@ -1009,7 +1009,7 @@ class CodroidSession:
         target: Union[JointPoint, CartesianPoint],
         speed: float, acceleration: float,
         wait: Optional[MotionWaitOptions] = None,
-        blend: float = 0.0,
+        blend: Optional[float] = None,
         coor: Optional[Sequence[float]] = None,
         tool: Optional[Sequence[float]] = None,
     ) -> bool:
@@ -1046,7 +1046,7 @@ class CodroidSession:
         target: Union[CartesianPoint, JointPoint],
         speed: float, acceleration: float,
         wait: Optional[MotionWaitOptions] = None,
-        blend: float = 0.0,
+        blend: Optional[float] = None,
         coor: Optional[Sequence[float]] = None,
         tool: Optional[Sequence[float]] = None,
     ) -> bool:
@@ -1084,7 +1084,7 @@ class CodroidSession:
         target: CartesianPoint,
         speed: float, acceleration: float,
         wait: Optional[MotionWaitOptions] = None,
-        blend: float = 0.0,
+        blend: Optional[float] = None,
         coor: Optional[Sequence[float]] = None,
         tool: Optional[Sequence[float]] = None,
     ) -> bool:
@@ -1109,7 +1109,7 @@ class CodroidSession:
         circle_num: int,
         speed: float, acceleration: float,
         wait: Optional[MotionWaitOptions] = None,
-        blend: float = 0.0,
+        blend: Optional[float] = None,
         coor: Optional[Sequence[float]] = None,
         tool: Optional[Sequence[float]] = None,
     ) -> bool:

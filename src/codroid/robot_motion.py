@@ -53,8 +53,8 @@ def pack_instruction(
     target: MovePoint,
     speed: float,
     acc: float,
-    blend: float = 0.0,
-    relative_blend: int = 0,
+    blend: Optional[float] = None,
+    relative_blend: Optional[float] = None,
     middle: Optional[MovePoint] = None,
     circle_num: Optional[int] = None,
     coor: Optional[Sequence[float]] = None,
@@ -67,10 +67,12 @@ def pack_instruction(
         "type": m_type.value,
         "speed": speed,
         "acc": acc,
-        "blend": blend,
-        "relativeBlend": relative_blend,
         "targetPoint": pack_move_point(target),
     }
+    if blend is not None:
+        item["blend"] = blend
+    if relative_blend is not None:
+        item["relativeBlend"] = relative_blend
 
     if middle is not None:
         item["middlePoint"] = pack_move_point(middle)

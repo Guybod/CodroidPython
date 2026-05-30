@@ -178,7 +178,7 @@ def MovJ(
     target: Union[JointPoint, CartesianPoint, MovePoint],
     speed: float,
     acceleration: float,
-    blend: float = 0.0,
+    blend: Optional[float] = None,
     coor: Optional[Sequence[float]] = None,
     tool: Optional[Sequence[float]] = None,
 ) -> CommonResponse
@@ -208,7 +208,7 @@ def MovL(
     target: Union[CartesianPoint, JointPoint, MovePoint],
     speed: float,
     acceleration: float,
-    blend: float = 0.0,
+    blend: Optional[float] = None,
     coor: Optional[Sequence[float]] = None,
     tool: Optional[Sequence[float]] = None,
 ) -> CommonResponse
@@ -225,7 +225,7 @@ def MovC(
     target: CartesianPoint,
     speed: float,
     acceleration: float,
-    blend: float = 0.0,
+    blend: Optional[float] = None,
     coor: Optional[Sequence[float]] = None,
     tool: Optional[Sequence[float]] = None,
 ) -> CommonResponse
@@ -243,7 +243,7 @@ def MovCircle(
     circle_num: int,
     speed: float,
     acceleration: float,
-    blend: float = 0.0,
+    blend: Optional[float] = None,
     coor: Optional[Sequence[float]] = None,
     tool: Optional[Sequence[float]] = None,
 ) -> CommonResponse
@@ -286,7 +286,7 @@ def MovJSync(
     speed: float,
     acceleration: float,
     wait: Optional[MotionWaitOptions] = None,
-    blend: float = 0.0,
+    blend: Optional[float] = None,
     coor: Optional[Sequence[float]] = None,
     tool: Optional[Sequence[float]] = None,
 ) -> bool
@@ -309,7 +309,7 @@ def MovLSync(
     speed: float,
     acceleration: float,
     wait: Optional[MotionWaitOptions] = None,
-    blend: float = 0.0,
+    blend: Optional[float] = None,
     coor: Optional[Sequence[float]] = None,
     tool: Optional[Sequence[float]] = None,
 ) -> bool
@@ -327,7 +327,7 @@ def MovCSync(
     speed: float,
     acceleration: float,
     wait: Optional[MotionWaitOptions] = None,
-    blend: float = 0.0,
+    blend: Optional[float] = None,
     coor: Optional[Sequence[float]] = None,
     tool: Optional[Sequence[float]] = None,
 ) -> bool
@@ -346,7 +346,7 @@ def MovCircleSync(
     speed: float,
     acceleration: float,
     wait: Optional[MotionWaitOptions] = None,
-    blend: float = 0.0,
+    blend: Optional[float] = None,
     coor: Optional[Sequence[float]] = None,
     tool: Optional[Sequence[float]] = None,
 ) -> bool

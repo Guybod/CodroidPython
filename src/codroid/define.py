@@ -285,8 +285,8 @@ class MoveInstruction:
     target: MovePoint
     speed: float
     acc: float
-    blend: float = 0.0
-    relative_blend: int = 0
+    blend: Optional[float] = None
+    relative_blend: Optional[float] = None
     middle: Optional[MovePoint] = None
     circle_num: Optional[int] = None
     coor: Optional[Sequence[float]] = None
@@ -314,8 +314,8 @@ class MoveInstruction:
         target: Union[JointPoint, CartesianPoint],
         speed: float,
         acc: float,
-        blend: float = 0.0,
-        relative_blend: int = 0,
+        blend: Optional[float] = None,
+        relative_blend: Optional[float] = None,
         coor: Optional[Sequence[float]] = None,
         tool: Optional[Sequence[float]] = None,
     ) -> MoveInstruction:
@@ -337,8 +337,8 @@ class MoveInstruction:
         target: Union[CartesianPoint, JointPoint],
         speed: float,
         acc: float,
-        blend: float = 0.0,
-        relative_blend: int = 0,
+        blend: Optional[float] = None,
+        relative_blend: Optional[float] = None,
         coor: Optional[Sequence[float]] = None,
         tool: Optional[Sequence[float]] = None,
     ) -> MoveInstruction:
@@ -361,8 +361,8 @@ class MoveInstruction:
         target: CartesianPoint,
         speed: float,
         acc: float,
-        blend: float = 0.0,
-        relative_blend: int = 0,
+        blend: Optional[float] = None,
+        relative_blend: Optional[float] = None,
         coor: Optional[Sequence[float]] = None,
         tool: Optional[Sequence[float]] = None,
     ) -> MoveInstruction:
@@ -387,8 +387,8 @@ class MoveInstruction:
         circle_num: int,
         speed: float,
         acc: float,
-        blend: float = 0.0,
-        relative_blend: int = 0,
+        blend: Optional[float] = None,
+        relative_blend: Optional[float] = None,
         coor: Optional[Sequence[float]] = None,
         tool: Optional[Sequence[float]] = None,
     ) -> MoveInstruction:
@@ -615,8 +615,8 @@ class MotionPath:
         target: Union[MovePoint, JointPoint, CartesianPoint],
         speed: float,
         acc: float,
-        blend: float = 0.0,
-        relative_blend: int = 0,
+        blend: Optional[float] = None,
+        relative_blend: Optional[float] = None,
         middle: Optional[Union[MovePoint, JointPoint, CartesianPoint]] = None,
         circle_num: Optional[int] = None,
         coor: Optional[Sequence[float]] = None,
@@ -647,7 +647,7 @@ class MotionPath:
         target: Union[MovePoint, JointPoint, CartesianPoint],
         speed: float,
         acc: float,
-        blend: float = 0.0,
+        blend: Optional[float] = None,
     ) -> MotionPath:
         """添加关节运动 movJ。"""
         return self._add_item(MotionType.MOVJ, target, speed, acc, blend)
@@ -657,7 +657,7 @@ class MotionPath:
         target: Union[MovePoint, JointPoint, CartesianPoint],
         speed: float,
         acc: float,
-        blend: float = 0.0,
+        blend: Optional[float] = None,
     ) -> MotionPath:
         """添加直线运动 movL。"""
         return self._add_item(MotionType.MOVL, target, speed, acc, blend)
@@ -668,7 +668,7 @@ class MotionPath:
         middle: Union[CartesianPoint, Sequence[float]],
         speed: float,
         acc: float,
-        blend: float = 0.0,
+        blend: Optional[float] = None,
     ) -> MotionPath:
         """添加圆弧运动 movC（目标与中间点均为 TCP）。"""
         target_mp = (

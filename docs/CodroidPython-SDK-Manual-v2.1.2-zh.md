@@ -553,7 +553,7 @@ def MovJ(
     target: Union[JointPoint, CartesianPoint, MovePoint],
     speed: float,
     acceleration: float,
-    blend: float = 0.0,
+    blend: Optional[float] = None,
     coor: Optional[Sequence[float]] = None,
     tool: Optional[Sequence[float]] = None,
 ) -> CommonResponse
@@ -566,9 +566,9 @@ def MovJ(
 | `target` | `JointPoint` / `CartesianPoint` | 运动目标 |
 | `speed` | `float` | 速度 |
 | `acceleration` | `float` | 加速度 |
-| `blend` | `float` | 平滑半径，默认 0（精确到达） |
-| `coor` | `Sequence[float]` | 用户坐标系 `[x,y,z,a,b,c]` |
-| `tool` | `Sequence[float]` | 工具坐标系 `[x,y,z,a,b,c]` |
+| `blend` | `Optional[float]` | 平滑半径。与 `relative_blend` 互斥——同时传入时 `relative_blend` 无效。不传表示无过渡 |
+| `coor` | `Optional[Sequence[float]]` | 用户坐标系 `[x,y,z,a,b,c]`。None 时指令中不包含该字段 |
+| `tool` | `Optional[Sequence[float]]` | 工具坐标系 `[x,y,z,a,b,c]`。None 时指令中不包含该字段 |
 
 ```python
 robot.MovJ(JointPoint.Degrees([0, 0, 90, 0, 90, 0]), speed=40, acceleration=100)
@@ -583,7 +583,7 @@ def MovL(
     target: Union[CartesianPoint, JointPoint, MovePoint],
     speed: float,
     acceleration: float,
-    blend: float = 0.0,
+    blend: Optional[float] = None,
     coor: Optional[Sequence[float]] = None,
     tool: Optional[Sequence[float]] = None,
 ) -> CommonResponse
@@ -600,7 +600,7 @@ def MovC(
     target: CartesianPoint,
     speed: float,
     acceleration: float,
-    blend: float = 0.0,
+    blend: Optional[float] = None,
     coor: Optional[Sequence[float]] = None,
     tool: Optional[Sequence[float]] = None,
 ) -> CommonResponse
@@ -618,7 +618,7 @@ def MovCircle(
     circle_num: int,
     speed: float,
     acceleration: float,
-    blend: float = 0.0,
+    blend: Optional[float] = None,
     coor: Optional[Sequence[float]] = None,
     tool: Optional[Sequence[float]] = None,
 ) -> CommonResponse
@@ -661,7 +661,7 @@ def MovJSync(
     speed: float,
     acceleration: float,
     wait: Optional[MotionWaitOptions] = None,
-    blend: float = 0.0,
+    blend: Optional[float] = None,
     coor: Optional[Sequence[float]] = None,
     tool: Optional[Sequence[float]] = None,
 ) -> bool
@@ -684,7 +684,7 @@ def MovLSync(
     speed: float,
     acceleration: float,
     wait: Optional[MotionWaitOptions] = None,
-    blend: float = 0.0,
+    blend: Optional[float] = None,
     coor: Optional[Sequence[float]] = None,
     tool: Optional[Sequence[float]] = None,
 ) -> bool
@@ -702,7 +702,7 @@ def MovCSync(
     speed: float,
     acceleration: float,
     wait: Optional[MotionWaitOptions] = None,
-    blend: float = 0.0,
+    blend: Optional[float] = None,
     coor: Optional[Sequence[float]] = None,
     tool: Optional[Sequence[float]] = None,
 ) -> bool
@@ -721,7 +721,7 @@ def MovCircleSync(
     speed: float,
     acceleration: float,
     wait: Optional[MotionWaitOptions] = None,
-    blend: float = 0.0,
+    blend: Optional[float] = None,
     coor: Optional[Sequence[float]] = None,
     tool: Optional[Sequence[float]] = None,
 ) -> bool
@@ -1420,8 +1420,8 @@ class MoveInstruction:
     target: MovePoint
     speed: float
     acc: float
-    blend: float = 0.0
-    relative_blend: int = 0
+    blend: Optional[float] = None
+    relative_blend: Optional[float] = None
     middle: Optional[MovePoint] = None
     circle_num: Optional[int] = None
     coor: Optional[Sequence[float]] = None
@@ -1439,8 +1439,8 @@ MoveInstruction.MovJ(
     target: Union[JointPoint, CartesianPoint],
     speed: float,
     acc: float,
-    blend: float = 0.0,
-    relative_blend: int = 0,
+    blend: Optional[float] = None,
+    relative_blend: Optional[float] = None,
     coor: Optional[Sequence[float]] = None,
     tool: Optional[Sequence[float]] = None,
 ) -> MoveInstruction
@@ -1455,8 +1455,8 @@ MoveInstruction.MovL(
     target: Union[CartesianPoint, JointPoint],
     speed: float,
     acc: float,
-    blend: float = 0.0,
-    relative_blend: int = 0,
+    blend: Optional[float] = None,
+    relative_blend: Optional[float] = None,
     coor: Optional[Sequence[float]] = None,
     tool: Optional[Sequence[float]] = None,
 ) -> MoveInstruction
@@ -1472,8 +1472,8 @@ MoveInstruction.MovC(
     target: CartesianPoint,
     speed: float,
     acc: float,
-    blend: float = 0.0,
-    relative_blend: int = 0,
+    blend: Optional[float] = None,
+    relative_blend: Optional[float] = None,
     coor: Optional[Sequence[float]] = None,
     tool: Optional[Sequence[float]] = None,
 ) -> MoveInstruction
@@ -1490,8 +1490,8 @@ MoveInstruction.MovCircle(
     circle_num: int,
     speed: float,
     acc: float,
-    blend: float = 0.0,
-    relative_blend: int = 0,
+    blend: Optional[float] = None,
+    relative_blend: Optional[float] = None,
     coor: Optional[Sequence[float]] = None,
     tool: Optional[Sequence[float]] = None,
 ) -> MoveInstruction
@@ -1575,9 +1575,9 @@ class JogCoorType(IntEnum):
 ```python
 class MotionPath:
     def add(self, instruction: MoveInstruction) -> MotionPath
-    def MovJ(self, target, speed, acc, blend=0.0) -> MotionPath
-    def MovL(self, target, speed, acc, blend=0.0) -> MotionPath
-    def MovC(self, target, middle, speed, acc, blend=0.0) -> MotionPath
+    def MovJ(self, target, speed, acc, blend=None) -> MotionPath
+    def MovL(self, target, speed, acc, blend=None) -> MotionPath
+    def MovC(self, target, middle, speed, acc, blend=None) -> MotionPath
     def clear(self) -> None
     def get_commands(self) -> List[Dict[str, Any]]
 ```
@@ -1631,13 +1631,14 @@ with CodroidClient(host="192.168.8.136") as robot:
 - `speed`：速度值，具体单位取决于运动类型和控制器配置。
 - `acceleration`：加速度值。
 
-#### blend
+#### blend / relative_blend
 
-平滑半径。默认 `0.0`（精确到达目标点）。设置大于 0 的值时，机器人在接近目标点时平滑过渡，不停留。
+- `blend`：平滑半径。与 `relative_blend` 互斥——同时传入时 `relative_blend` 无效。不传表示无过渡。
+- `relative_blend`：相对平滑比（0–1）。与 `blend` 互斥——同时传入时此参数无效。
 
 #### coor / tool
 
-可选的用户坐标系和工具坐标系，格式为 `[x, y, z, a, b, c]`（mm + 度）。
+可选的用户坐标系和工具坐标系，格式为 `[x, y, z, a, b, c]`（mm + 度）。None 时指令中不包含该字段。
 
 <div style="page-break-after: always;"></div>
 
@@ -2793,8 +2794,8 @@ def AposToCpos(
 | 参数 | 类型 | 说明 |
 |------|------|------|
 | `jp` | `Sequence[float]` | 6 个关节角（度） |
-| `coor` | `Sequence[float]` | 用户坐标系 `[x,y,z,a,b,c]` |
-| `tool` | `Sequence[float]` | 工具坐标系 `[x,y,z,a,b,c]` |
+| `coor` | `Optional[Sequence[float]]` | 用户坐标系 `[x,y,z,a,b,c]`。None 时指令中不包含该字段 |
+| `tool` | `Optional[Sequence[float]]` | 工具坐标系 `[x,y,z,a,b,c]`。None 时指令中不包含该字段 |
 | `ep` | `Sequence[float]` | 外部轴位置 |
 
 ```python
