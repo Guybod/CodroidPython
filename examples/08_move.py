@@ -91,7 +91,7 @@ def main(argv: list[str]) -> int:
     # AGENTS.md §5.1 S20 常用测试点（度 / mm+度）
     joint_home = JointPoint.Degrees([0, 0, 0, 0, 0, 0])
     joint_pose = JointPoint.Degrees([0, 0, 90, 0, 90, 0])
-    cart_p1 = [927.511, 214.489, 486.524, 179.999, 0.0, -89.999]
+    cart_p1 = [927.51,214.488,486.526,179.999,0,-89.999]
     cart_p2 = [927.516, 214.489, 900.0, 180.0, 0.0, -89.999]
     # C++ 04_move.cpp 圆弧：中间点 → 终点 line_p1
     circle_middle = CartesianPoint.MmDeg(
@@ -149,7 +149,7 @@ def main(argv: list[str]) -> int:
                 MoveInstruction.MovJ(joint_pose, speed=40, acc=100),
                 MoveInstruction.MovJ(line_p2, speed=40, acc=100),
                 MoveInstruction.MovL(line_p1, speed=150, acc=500, blend=25),
-                MoveInstruction.MovL(joint_home, speed=150, acc=500, blend=25),
+                MoveInstruction.MovL(joint_pose, speed=150, acc=500, blend=25),
                 MoveInstruction.MovC(
                     circle_middle, circle_end, speed=120, acc=400, blend=25
                 ),

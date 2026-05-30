@@ -45,25 +45,25 @@ def main(argv: list[str]) -> int:
     path = [
         MoveInstruction.MovJ(JointPoint.Degrees([0, 0, 90, 0, 90, 0]), speed=60, acc=150),
         MoveInstruction.MovL(
-            CartesianPoint.MmDeg([494, 191, 444, -180, 0, -90]),
+            CartesianPoint.MmDeg([927.51,214.488,486.526,179.999,0,-89.999]),
             speed=500,
             acc=1500,
             blend=30,
         ),
         MoveInstruction.MovL(
-            CartesianPoint.MmDeg([294, 191, 444, -180, 0, -90]),
+            CartesianPoint.MmDeg([927.51,214.488,886.526,179.999,0,-89.999]),
             speed=500,
             acc=1500,
             blend=30,
         ),
         MoveInstruction.MovL(
-            CartesianPoint.MmDeg([494, 391, 444, -180, 0, -90]),
+            CartesianPoint.MmDeg([927.51,214.488,486.526,179.999,0,-89.999]),
             speed=500,
             acc=1500,
             blend=30,
         ),
         MoveInstruction.MovL(
-            CartesianPoint.MmDeg([494, 191, 644, -180, 0, -90]),
+            CartesianPoint.MmDeg([927.51,214.488,886.526,179.999,0,-89.999]),
             speed=500,
             acc=1500,
             blend=30,
@@ -72,7 +72,7 @@ def main(argv: list[str]) -> int:
             JointPoint.Degrees([0, 0, 90, 0, 90, 0]),
             speed=60,
             acc=150,
-            blend=0,
+            relative_blend=80,
         ),
     ]
 

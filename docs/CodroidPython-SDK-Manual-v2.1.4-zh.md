@@ -451,6 +451,10 @@ def Connect(self) -> CodroidSession
 
 建立 TCP 连接。返回自身以支持链式调用。使用 `with` 语句时自动调用。
 
+**返回值：** 无
+
+**异常：** 无
+
 #### Disconnect
 
 ```python
@@ -458,6 +462,10 @@ def Disconnect(self) -> None
 ```
 
 断开 TCP 连接并停止 CRI 接收。使用 `with` 语句时自动调用。
+
+**返回值：** 无
+
+**异常：** 无
 
 ---
 
@@ -476,6 +484,10 @@ with CodroidClient(host="192.168.1.136") as robot:
     robot.ConnectRemoteAndSwitchOn()
 ```
 
+**返回值：** 无
+
+**异常：** `CodroidError`
+
 #### EnterRemoteModeViaAuto
 
 ```python
@@ -484,6 +496,10 @@ def EnterRemoteModeViaAuto(self) -> CommonResponse
 
 先 `ToAuto()` 再 `ToRemote()`。
 
+**返回值：** 无
+
+**异常：** `CodroidError`
+
 #### EnterManualModeViaAuto
 
 ```python
@@ -491,6 +507,10 @@ def EnterManualModeViaAuto(self) -> CommonResponse
 ```
 
 先 `ToAuto()` 再 `ToManual()`。
+
+**返回值：** 无
+
+**异常：** `CodroidError`
 
 ---
 
@@ -505,6 +525,10 @@ def SwitchOff(self) -> CommonResponse
 
 上使能 / 下使能。
 
+**返回值：** 无
+
+**异常：** `CodroidError`
+
 #### ToRemote / ToManual / ToAuto
 
 ```python
@@ -515,6 +539,10 @@ def ToAuto(self) -> CommonResponse
 
 切换到远程 / 手动 / 自动模式。
 
+**返回值：** 无
+
+**异常：** `CodroidError`
+
 #### ToSimulation / ToActual
 
 ```python
@@ -523,6 +551,10 @@ def ToActual(self) -> CommonResponse
 ```
 
 切换到仿真 / 实机模式。
+
+**返回值：** 无
+
+**异常：** `CodroidError`
 
 #### StartDrag / StopDrag
 
@@ -533,6 +565,10 @@ def StopDrag(self) -> CommonResponse
 
 进入 / 退出拖拽示教模式。仅在远程模式和手动模式下可用。
 
+**返回值：** 无
+
+**异常：** `CodroidError`
+
 #### ClearSystemError
 
 ```python
@@ -540,6 +576,10 @@ def ClearSystemError(self) -> CommonResponse
 ```
 
 清除系统错误。
+
+**返回值：** 无
+
+**异常：** `CodroidError`
 
 ---
 
@@ -570,6 +610,10 @@ def MovJ(
 | `coor` | `Optional[Sequence[float]]` | 用户坐标系 `[x,y,z,a,b,c]`。None 时指令中不包含该字段 |
 | `tool` | `Optional[Sequence[float]]` | 工具坐标系 `[x,y,z,a,b,c]`。None 时指令中不包含该字段 |
 
+**返回值：** `CommonResponse` — 控制器响应
+
+**异常：** `CodroidError`（控制器返回错误）
+
 ```python
 robot.MovJ(JointPoint.Degrees([0, 0, 90, 0, 90, 0]), speed=40, acceleration=100)
 robot.MovJ(CartesianPoint.MmDeg([400, 200, 500, 180, 0, 90]), speed=40, acceleration=100)
@@ -591,6 +635,19 @@ def MovL(
 
 直线插补运动。目标可为 `CartesianPoint` 或 `JointPoint`。
 
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `target` | `CartesianPoint` / `JointPoint` | — | 运动目标 |
+| `speed` | `float` | — | 速度 |
+| `acceleration` | `float` | — | 加速度 |
+| `blend` | `Optional[float]` | `None` | 平滑半径。与 `relative_blend` 互斥。None 表示无过渡 |
+| `coor` | `Optional[Sequence[float]]` | `None` | 用户坐标系。None 时指令中不包含该字段 |
+| `tool` | `Optional[Sequence[float]]` | `None` | 工具坐标系。None 时指令中不包含该字段 |
+
+**返回值：** `CommonResponse` — 控制器响应
+
+**异常：** `CodroidError`（控制器返回错误）
+
 #### MovC
 
 ```python
@@ -607,6 +664,20 @@ def MovC(
 ```
 
 圆弧运动。中间点与目标均为 `CartesianPoint`。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `middle` | `CartesianPoint` | — | 中间点 |
+| `target` | `CartesianPoint` | — | 目标点 |
+| `speed` | `float` | — | 速度 |
+| `acceleration` | `float` | — | 加速度 |
+| `blend` | `Optional[float]` | `None` | 平滑半径。与 `relative_blend` 互斥。None 表示无过渡 |
+| `coor` | `Optional[Sequence[float]]` | `None` | 用户坐标系。None 时指令中不包含该字段 |
+| `tool` | `Optional[Sequence[float]]` | `None` | 工具坐标系。None 时指令中不包含该字段 |
+
+**返回值：** `CommonResponse` — 控制器响应
+
+**异常：** `CodroidError`（控制器返回错误）
 
 #### MovCircle
 
@@ -626,6 +697,21 @@ def MovCircle(
 
 整圆运动。`circle_num` 为圈数。
 
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `middle` | `CartesianPoint` | — | 中间点 |
+| `target` | `CartesianPoint` | — | 目标点 |
+| `circle_num` | `int` | — | 圈数 |
+| `speed` | `float` | — | 速度 |
+| `acceleration` | `float` | — | 加速度 |
+| `blend` | `Optional[float]` | `None` | 平滑半径。与 `relative_blend` 互斥。None 表示无过渡 |
+| `coor` | `Optional[Sequence[float]]` | `None` | 用户坐标系。None 时指令中不包含该字段 |
+| `tool` | `Optional[Sequence[float]]` | `None` | 工具坐标系。None 时指令中不包含该字段 |
+
+**返回值：** `CommonResponse` — 控制器响应
+
+**异常：** `CodroidError`（控制器返回错误）
+
 #### Move
 
 ```python
@@ -636,6 +722,14 @@ def Move(
 ```
 
 多段路径执行。推荐使用 `List[MoveInstruction]`。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `path` | `MotionPath` / `List[MoveInstruction]` | — | 多段路径 |
+
+**返回值：** `CommonResponse` — 控制器响应
+
+**异常：** `CodroidError`（控制器返回错误）
 
 ```python
 path = [
@@ -669,6 +763,20 @@ def MovJSync(
 
 阻塞式关节运动。到达目标返回 `True`。
 
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `target` | `JointPoint` / `CartesianPoint` | — | 运动目标 |
+| `speed` | `float` | — | 速度 |
+| `acceleration` | `float` | — | 加速度 |
+| `wait` | `Optional[MotionWaitOptions]` | `None` | 等待选项 |
+| `blend` | `Optional[float]` | `None` | 平滑半径。None 表示无过渡 |
+| `coor` | `Optional[Sequence[float]]` | `None` | 用户坐标系 |
+| `tool` | `Optional[Sequence[float]]` | `None` | 工具坐标系 |
+
+**返回值：** `bool` — 到达目标返回 `True`
+
+**异常：** `TimeoutException`（运动超时）、`CodroidError`（异常状态或未到达目标）
+
 ```python
 robot.StartListenUdp()
 robot.WaitForCriData()
@@ -692,6 +800,20 @@ def MovLSync(
 
 阻塞式直线运动。
 
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `target` | `CartesianPoint` / `JointPoint` | — | 运动目标 |
+| `speed` | `float` | — | 速度 |
+| `acceleration` | `float` | — | 加速度 |
+| `wait` | `Optional[MotionWaitOptions]` | `None` | 等待选项 |
+| `blend` | `Optional[float]` | `None` | 平滑半径。None 表示无过渡 |
+| `coor` | `Optional[Sequence[float]]` | `None` | 用户坐标系 |
+| `tool` | `Optional[Sequence[float]]` | `None` | 工具坐标系 |
+
+**返回值：** `bool` — 到达目标返回 `True`
+
+**异常：** `TimeoutException`（运动超时）、`CodroidError`（异常状态或未到达目标）
+
 #### MovCSync
 
 ```python
@@ -709,6 +831,21 @@ def MovCSync(
 ```
 
 阻塞式圆弧运动。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `middle` | `CartesianPoint` | — | 中间点 |
+| `target` | `CartesianPoint` | — | 目标点 |
+| `speed` | `float` | — | 速度 |
+| `acceleration` | `float` | — | 加速度 |
+| `wait` | `Optional[MotionWaitOptions]` | `None` | 等待选项 |
+| `blend` | `Optional[float]` | `None` | 平滑半径。None 表示无过渡 |
+| `coor` | `Optional[Sequence[float]]` | `None` | 用户坐标系 |
+| `tool` | `Optional[Sequence[float]]` | `None` | 工具坐标系 |
+
+**返回值：** `bool` — 到达目标返回 `True`
+
+**异常：** `TimeoutException`（运动超时）、`CodroidError`（异常状态或未到达目标）
 
 #### MovCircleSync
 
@@ -729,6 +866,22 @@ def MovCircleSync(
 
 阻塞式整圆运动。
 
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `middle` | `CartesianPoint` | — | 中间点 |
+| `target` | `CartesianPoint` | — | 目标点 |
+| `circle_num` | `int` | — | 圈数 |
+| `speed` | `float` | — | 速度 |
+| `acceleration` | `float` | — | 加速度 |
+| `wait` | `Optional[MotionWaitOptions]` | `None` | 等待选项 |
+| `blend` | `Optional[float]` | `None` | 平滑半径。None 表示无过渡 |
+| `coor` | `Optional[Sequence[float]]` | `None` | 用户坐标系 |
+| `tool` | `Optional[Sequence[float]]` | `None` | 工具坐标系 |
+
+**返回值：** `bool` — 到达目标返回 `True`
+
+**异常：** `TimeoutException`（运动超时）、`CodroidError`（异常状态或未到达目标）
+
 #### MoveSync
 
 ```python
@@ -740,6 +893,15 @@ def MoveSync(
 ```
 
 阻塞式路径执行。等待 CRI 确认最后一段到达目标。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `path` | `List[MoveInstruction]` | — | 多段路径指令列表 |
+| `wait` | `Optional[MotionWaitOptions]` | `None` | 等待选项 |
+
+**返回值：** `bool` — 到达目标返回 `True`
+
+**异常：** `TimeoutException`（运动超时）、`CodroidError`（异常状态或未到达目标）
 
 #### MotionWaitOptions
 
@@ -778,6 +940,10 @@ def ResumeRobotMotion(self) -> CommonResponse
 
 暂停 / 恢复当前运动。
 
+**返回值：** 无
+
+**异常：** `CodroidError`
+
 #### StopRobotMove
 
 ```python
@@ -785,6 +951,10 @@ def StopRobotMove(self) -> CommonResponse
 ```
 
 停止当前运动。
+
+**返回值：** 无
+
+**异常：** `CodroidError`
 
 ---
 
@@ -820,6 +990,15 @@ robot.MoveTo(MoveToType.HOME)  # 回 Home
 robot.MoveTo(MoveToType.SAFE)  # 回安全位
 ```
 
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `move_type` | `MoveToType` | — | 运动类型枚举 |
+| `target` | `Optional[MoveToTarget]` | `None` | 运动目标（`JOINT`/`LINEAR` 时必填） |
+
+**返回值：** 无
+
+**异常：** `CodroidError`
+
 启动后须每 0.5s 调用 `MoveToHeartbeat()`。
 
 #### MoveToHeartbeat
@@ -830,6 +1009,10 @@ def MoveToHeartbeat(self) -> CommonResponse
 
 MoveTo 心跳。须在 MoveTo 运动期间每隔 0.5s 调用一次。
 
+**返回值：** 无
+
+**异常：** `CodroidError`
+
 #### StopMoveTo
 
 ```python
@@ -837,6 +1020,10 @@ def StopMoveTo(self) -> CommonResponse
 ```
 
 停止当前 MoveTo 运动。
+
+**返回值：** 无
+
+**异常：** `CodroidError`
 
 ---
 
@@ -871,6 +1058,10 @@ from codroid import JogMode
 robot.StartJog(JogMode.JOINT, index=1, speed=0.5)  # 关节 1 正向点动
 ```
 
+**返回值：** 无
+
+**异常：** `CodroidError`
+
 #### StopJog
 
 ```python
@@ -879,6 +1070,10 @@ def StopJog(self) -> CommonResponse
 
 停止点动。
 
+**返回值：** 无
+
+**异常：** `CodroidError`
+
 #### JogHeartbeat
 
 ```python
@@ -886,6 +1081,10 @@ def JogHeartbeat(self) -> CommonResponse
 ```
 
 点动心跳。须在点动期间每隔 0.5s 调用一次。
+
+**返回值：** 无
+
+**异常：** `CodroidError`
 
 ---
 
@@ -899,6 +1098,14 @@ def SetAutoMoveRate(self, rate: int) -> CommonResponse
 ```
 
 设置手动 / 自动运动倍率。`rate` 范围 1~100。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `rate` | `int` | — | 速度百分比，范围 1~100 |
+
+**返回值：** 无
+
+**异常：** `CodroidError`、`ValueError`
 
 ---
 
@@ -918,6 +1125,10 @@ robot.WaitForCriData()
 data = robot.CriData
 ```
 
+**返回值：** 无
+
+**异常：** `CodroidError`
+
 #### WaitForCriData
 
 ```python
@@ -925,6 +1136,14 @@ def WaitForCriData(self, timeout: float = 5.0) -> CriRealTimeData
 ```
 
 等待第一个 CRI 数据包到达。超时抛出 `CodroidTimeoutError`。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `timeout` | `float` | `5.0` | 等待超时时间（秒） |
+
+**返回值：** 无
+
+**异常：** `CodroidTimeoutError`
 
 #### StartCriDataPush
 
@@ -941,6 +1160,15 @@ def StartCriDataPush(
 
 手动开启 CRI UDP 推送。`port` 范围 10000–65534。`duration` 为推送周期（ms）。
 
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `ip` | `str` | — | 推送目标 IP 地址 |
+| `port` | `int` | — | 推送目标端口（10000–65534） |
+
+**返回值：** 无
+
+**异常：** `CodroidError`
+
 #### StopCriDataPush
 
 ```python
@@ -948,6 +1176,15 @@ def StopCriDataPush(self, ip: Optional[str] = None, port: Optional[int] = None) 
 ```
 
 停止 CRI 推送。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `ip` | `Optional[str]` | `None` | 推送目标 IP 地址。None 时使用上次推送的 IP |
+| `port` | `Optional[int]` | `None` | 推送目标端口。None 时使用上次推送的端口 |
+
+**返回值：** 无
+
+**异常：** `CodroidError`
 
 #### StartCriControl
 
@@ -962,6 +1199,16 @@ def StartCriControl(
 
 开启 CRI 实时控制模式。`duration` 为指令间隔（ms，1–16，且可整除 1000）。
 
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `filter_type` | `int` | `1` | 滤波类型（`CriFilterType` 枚举） |
+| `duration_ms` | `int` | `4` | 指令间隔（ms，1–16） |
+| `start_buffer` | `int` | `5` | 启动缓冲帧数 |
+
+**返回值：** 无
+
+**异常：** `CodroidError`
+
 #### StopCriControl
 
 ```python
@@ -969,6 +1216,10 @@ def StopCriControl(self) -> CommonResponse
 ```
 
 关闭 CRI 实时控制。
+
+**返回值：** 无
+
+**异常：** `CodroidError`
 
 ---
 
@@ -1056,6 +1307,10 @@ def GetRobotParameters(self) -> RobotParameters
 
 获取设置界面参数快照。返回 `RobotParameters`，包含工具坐标系表、负载坐标系表、用户坐标系表及默认 ID。
 
+**返回值：** `RobotParameters` — 包含工具、负载、用户坐标系表及默认 ID 的参数快照。
+
+**异常：** `CodroidError`
+
 ```python
 params = robot.GetRobotParameters()
 print(f"默认工具: {params.default_tool_id}")
@@ -1073,6 +1328,21 @@ def SaveToolFrames(self, frames) -> CommonResponse
 
 `SetToolFrame` 修改单个工具坐标系（先读后改再保存，`frame_id` 仅允许 1~15）。`SaveToolFrames` 下发完整表（16 项，id=0 须全零）。
 
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `frame_id` | `int` | — | 工具坐标系槽位编号（1~15） |
+| `frame` | `RobotFrame` | — | 工具坐标系数据 |
+
+`SaveToolFrames` 参数：
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `frames` | `list[RobotFrame]` | — | 完整工具坐标系表（16 项，id=0 须全零） |
+
+**返回值：** 无
+
+**异常：** `CodroidError`, `ValueError`
+
 ```python
 from codroid import RobotFrame
 
@@ -1087,6 +1357,21 @@ def SavePayloadFrames(self, frames) -> CommonResponse
 ```
 
 `SetPayloadFrame` 修改单个负载坐标系（`frame_id` 仅允许 1~15）。`SavePayloadFrames` 下发完整表。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `frame_id` | `int` | — | 负载坐标系槽位编号（1~15） |
+| `frame` | `RobotPayloadFrame` | — | 负载坐标系数据 |
+
+`SavePayloadFrames` 参数：
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `frames` | `list[RobotPayloadFrame]` | — | 完整负载坐标系表（16 项，id=0 须全零） |
+
+**返回值：** 无
+
+**异常：** `CodroidError`, `ValueError`
 
 ```python
 from codroid import RobotPayloadFrame
@@ -1103,6 +1388,21 @@ def SaveUserCoordinateFrames(self, frames) -> CommonResponse
 
 修改单个 / 下发完整用户坐标系表。
 
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `frame_id` | `int` | — | 用户坐标系槽位编号（1~15） |
+| `frame` | `RobotFrame` | — | 用户坐标系数据 |
+
+`SaveUserCoordinateFrames` 参数：
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `frames` | `list[RobotFrame]` | — | 完整用户坐标系表（16 项，id=0 须全零） |
+
+**返回值：** 无
+
+**异常：** `CodroidError`, `ValueError`
+
 #### SetDefaultToolId / SetDefaultPayloadId / SetDefaultUserCoordinateId
 
 ```python
@@ -1113,6 +1413,16 @@ def SetDefaultUserCoordinateId(self, coordinate_id: int) -> CommonResponse
 
 设置默认工具 / 负载 / 用户坐标系编号。范围 0~15。
 
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `tool_id` | `int` | — | 工具坐标系编号（0~15） |
+| `payload_id` | `int` | — | 负载编号（0~15） |
+| `coordinate_id` | `int` | — | 用户坐标系编号（0~15） |
+
+**返回值：** 无
+
+**异常：** `CodroidError`, `ValueError`
+
 #### SetCollisionSensitivity
 
 ```python
@@ -1121,6 +1431,14 @@ def SetCollisionSensitivity(self, sensitivity: int) -> CommonResponse
 
 设置碰撞检测灵敏度。范围 0~100。仅固件 2.3.2.10+ 可用。
 
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `sensitivity` | `int` | — | 碰撞灵敏度（0~100） |
+
+**返回值：** 无
+
+**异常：** `CodroidError`, `ValueError`
+
 #### SetPayload
 
 ```python
@@ -1128,6 +1446,14 @@ def SetPayload(self, payload_id: int) -> CommonResponse
 ```
 
 设置当前负载编号。仅固件 2.3.2.10+ 可用。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `payload_id` | `int` | — | 负载编号（0~15） |
+
+**返回值：** 无
+
+**异常：** `CodroidError`, `ValueError`
 
 ---
 
@@ -1152,6 +1478,18 @@ def RunScript(
 robot.RunScript('print("hello")', vars={"speed": 100})
 ```
 
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `main_script` | `str` | — | 主脚本内容（Lua 代码） |
+| `sub_threads` | `Optional[dict]` | `None` | 子线程字典 |
+| `sub_programs` | `Optional[dict]` | `None` | 子程序字典 |
+| `interrupts` | `Optional[dict]` | `None` | 中断处理字典 |
+| `vars` | `Optional[dict]` | `None` | 传入脚本的变量字典 |
+
+**返回值：** 无
+
+**异常：** `CodroidError`
+
 #### Run / RunByIndex / RunStep
 
 ```python
@@ -1161,6 +1499,15 @@ def RunStep(self, project_id: str) -> CommonResponse
 ```
 
 运行 / 单步运行工程。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `project_id` | `str` | — | 工程 ID（`Run` / `RunStep` 使用） |
+| `index` | `int` | — | 工程索引（`RunByIndex` 使用） |
+
+**返回值：** 无
+
+**异常：** `CodroidError`
 
 #### PauseProject / ResumeProject / StopProject
 
@@ -1172,6 +1519,10 @@ def StopProject(self) -> CommonResponse
 
 暂停 / 恢复 / 停止工程。
 
+**返回值：** 无
+
+**异常：** `CodroidError`
+
 #### EnterRemoteScriptMode
 
 ```python
@@ -1179,6 +1530,10 @@ def EnterRemoteScriptMode(self) -> CommonResponse
 ```
 
 进入远程脚本模式。
+
+**返回值：** 无
+
+**异常：** `CodroidError`
 
 #### SetStartLine / ClearStartLine
 
@@ -1188,6 +1543,14 @@ def ClearStartLine(self) -> CommonResponse
 ```
 
 设置 / 清除启动行。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `line` | `int` | — | 启动行号（`SetStartLine` 使用） |
+
+**返回值：** 无
+
+**异常：** `CodroidError`
 
 ---
 
@@ -1212,6 +1575,17 @@ from codroid import RS485BaudRate
 robot.Rs485Init(RS485BaudRate.B115200)
 ```
 
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `baud_rate` | `int` | — | 波特率（`RS485BaudRate` 枚举值） |
+| `data_bits` | `int` | `8` | 数据位 |
+| `stop_bits` | `int` | `1` | 停止位 |
+| `parity` | `int` | `0` | 校验位（0=无，1=奇，2=偶） |
+
+**返回值：** 无
+
+**异常：** `CodroidError`
+
 #### Rs485Flush
 
 ```python
@@ -1219,6 +1593,10 @@ def Rs485Flush(self) -> CommonResponse
 ```
 
 清空 RS485 读取缓存。
+
+**返回值：** 无
+
+**异常：** `CodroidError`
 
 #### Rs485Read
 
@@ -1228,6 +1606,14 @@ def Rs485Read(self, length: int, timeout: int = 3000) -> CommonResponse
 
 读取 RS485 数据。`length` 最大 128 字节，`timeout` 最大 3000ms。
 
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `length` | `int` | — | 读取字节数（最大 128） |
+
+**返回值：** `bytes` — 读取到的数据
+
+**异常：** `CodroidError`
+
 #### Rs485Write
 
 ```python
@@ -1235,6 +1621,14 @@ def Rs485Write(self, data: Union[List[int], bytes]) -> CommonResponse
 ```
 
 发送 RS485 数据。最大 127 字节。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `data` | `bytes` | — | 要发送的数据（最大 127 字节） |
+
+**返回值：** 无
+
+**异常：** `CodroidError`
 
 ---
 
@@ -1254,6 +1648,17 @@ def AposToCpos(
 
 正解（关节 → 笛卡尔）。`jp` 为 6 个关节角（度）。
 
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `joint_degrees` | `list[float]` | — | 6 个关节角（度） |
+| `user_frame` | `list[float]` | — | 用户坐标系 `[x,y,z,a,b,c]` |
+| `tool_frame` | `list[float]` | — | 工具坐标系 `[x,y,z,a,b,c]` |
+| `external_axis_positions` | `Optional[list[float]]` | `None` | 外部轴位置 |
+
+**返回值：** `list[float]` — 笛卡尔位姿 `[x,y,z,rx,ry,rz]`
+
+**异常：** `CodroidError`
+
 #### CposToApos
 
 ```python
@@ -1266,6 +1671,16 @@ def CposToApos(
 ```
 
 逆解（笛卡尔 → 关节）。`cp` 为 `[x,y,z,a,b,c]`，`rj` 为参考关节角（默认 `[20,20,20,20,20,20]`）。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `cartesian_mm_deg` | `list[float]` | — | 笛卡尔位姿 `[x,y,z,rx,ry,rz]`（mm + 度） |
+| `reference_joint_degrees` | `list[float]` | — | 参考关节角（6 个值，度） |
+| `external_axis_positions` | `Optional[list[float]]` | `None` | 外部轴位置 |
+
+**返回值：** `list[float]` — 6 个关节角（度）
+
+**异常：** `CodroidError`, `ValueError`
 
 #### CalculateRelativePose
 
@@ -1310,6 +1725,16 @@ with CodroidClient(host="192.168.1.136") as robot:
     # ... 运行 ...
     sub.dispose()
 ```
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `topic_ty` | `str` | — | 主题类型（`PublishTopics` 常量） |
+| `handler` | `Callable` | — | 回调函数，接收 `PublishNotification` |
+| `tc_milliseconds` | `int` | `100` | 推送周期（ms） |
+
+**返回值：** `PublishTopicSubscription` — 订阅句柄，调用 `.dispose()` 取消订阅
+
+**异常：** `CodroidError`
 
 ---
 
@@ -2380,6 +2805,14 @@ def GetDi(self, port: int) -> int
 
 获取数字输入（DI）值。端口 0~15，返回 0 或 1。
 
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `port` | `int` | — | DI 端口号（0~15） |
+
+**返回值：** `int` — 0 或 1。
+
+**异常：** `CodroidError`
+
 ##### GetDo
 
 ```python
@@ -2388,6 +2821,14 @@ def GetDo(self, port: int) -> int
 
 获取数字输出（DO）值。端口 0~15，返回 0 或 1。
 
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `port` | `int` | — | DO 端口号（0~15） |
+
+**返回值：** `int` — 0 或 1。
+
+**异常：** `CodroidError`
+
 ##### SetDo
 
 ```python
@@ -2395,6 +2836,15 @@ def SetDo(self, port: int, value: int) -> CommonResponse
 ```
 
 设置数字输出（DO）值。端口 0~15，值为 0 或 1。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `port` | `int` | — | DO 端口号（0~15） |
+| `value` | `int` | — | 输出值（0 或 1） |
+
+**返回值：** 无
+
+**异常：** `CodroidError`, `ValueError`
 
 ```python
 di0 = robot.GetDi(0)        # 读取 DI 端口 0
@@ -2414,6 +2864,14 @@ def GetAi(self, port: int) -> float
 
 获取模拟输入（AI）值。端口 0~3。
 
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `port` | `int` | — | AI 端口号（0~3） |
+
+**返回值：** `float`
+
+**异常：** `CodroidError`
+
 ##### GetAo
 
 ```python
@@ -2422,6 +2880,14 @@ def GetAo(self, port: int) -> float
 
 获取模拟输出（AO）值。端口 0~3。
 
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `port` | `int` | — | AO 端口号（0~3） |
+
+**返回值：** `float`
+
+**异常：** `CodroidError`
+
 ##### SetAo
 
 ```python
@@ -2429,6 +2895,15 @@ def SetAo(self, port: int, value: float) -> CommonResponse
 ```
 
 设置模拟输出（AO）值。端口 0~3。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `port` | `int` | — | AO 端口号（0~3） |
+| `value` | `float` | — | 输出值 |
+
+**返回值：** 无
+
+**异常：** `CodroidError`
 
 ```python
 ai0 = robot.GetAi(0)        # 读取 AI 端口 0
@@ -2451,6 +2926,10 @@ def GetIoValues(self, io_requests: List[Dict[str, Any]]) -> CommonResponse
 |------|------|------|
 | `io_requests` | `List[Dict]` | 包含 `type` 和 `port` 的列表 |
 
+**返回值：** `CommonResponse` — `db` 中包含各 IO 值的列表。
+
+**异常：** `CodroidError`
+
 ```python
 response = robot.GetIoValues([
     {"type": "DI", "port": 0},
@@ -2468,6 +2947,14 @@ def SetIoValues(self, io_list: List[Dict[str, Any]]) -> List[CommonResponse]
 ```
 
 批量设置 IO 值。内部通过循环调用 `SetDo` / `SetAo` 实现。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `io_list` | `List[Dict]` | — | 包含 `type`、`port` 和 `value` 的列表 |
+
+**返回值：** 无
+
+**异常：** `CodroidError`
 
 ```python
 robot.SetIoValues([
@@ -2502,6 +2989,14 @@ def GetRegisterValue(self, address: int) -> Any
 
 获取单个寄存器值。
 
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `address` | `int` | — | 寄存器地址 |
+
+**返回值：** `RegisterReadValue` — 寄存器读取结果。
+
+**异常：** `CodroidError`
+
 #### GetRegisterValues
 
 ```python
@@ -2509,6 +3004,14 @@ def GetRegisterValues(self, addresses: List[int]) -> CommonResponse
 ```
 
 批量获取多个寄存器值。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `addresses` | `list[int]` | — | 寄存器地址列表 |
+
+**返回值：** `list[RegisterReadValue]` — 各寄存器的读取结果列表。
+
+**异常：** `CodroidError`
 
 ```python
 val = robot.GetRegisterValue(0)
@@ -2524,6 +3027,15 @@ def SetRegisterValue(self, address: int, value: Any) -> CommonResponse
 ```
 
 写入寄存器值。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `address` | `int` | — | 寄存器地址 |
+| `value` | `int` / `float` | — | 写入值 |
+
+**返回值：** 无
+
+**异常：** `CodroidError`
 
 ```python
 robot.SetRegisterValue(0, 42)
@@ -2541,6 +3053,15 @@ def SetExtendArrayType(self, index: int, data_type: ExtendArrayType) -> CommonRe
 ```
 
 设置扩展数组数据类型。`index` 范围 0~999。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `index` | `int` | — | 扩展数组索引（0~999） |
+| `type` | `str` | — | 数据类型（`ExtendArrayType` 枚举） |
+
+**返回值：** 无
+
+**异常：** `CodroidError`, `ValueError`
 
 | 数据类型 | 说明 |
 |----------|------|
@@ -2566,6 +3087,14 @@ def RemoveExtendArray(self, index: int) -> CommonResponse
 ```
 
 删除扩展数组索引（重置数据）。`index` 范围 0~999。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `index` | `int` | — | 扩展数组索引（0~999） |
+
+**返回值：** 无
+
+**异常：** `CodroidError`, `ValueError`
 
 ---
 
