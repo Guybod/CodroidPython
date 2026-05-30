@@ -8,6 +8,8 @@
   - 之前不传 `blend` 会发送 `0.0` 到控制器，现在不传表示**无过渡**
   - 如需保持旧行为，请显式传入 `blend=0`
 - **`relative_blend` 参数类型变更**：`int`（默认 `0`）→ `Optional[float]`（默认 `None`）
+  - 之前不传会发送 `0` 到控制器，现在不传表示**不使用相对平滑**
+  - 如需保持旧行为，请显式传入 `relative_blend=0`
 - **`blend` 与 `relative_blend` 互斥**：同时传入时 `relative_blend` 无效
 - **`coor`/`tool` 语义明确**：`None` 表示指令中不包含该字段
 
