@@ -173,7 +173,32 @@ def main(argv: list[str]) -> int:
             robot.MovJSync(joint_home, speed=40, acceleration=100, wait=opts)
             print("  ✓ 到达目标")
 
-            PrintBanner("08 — 完成", subtitle="四组合 + MovC + Sync 阻塞运动")
+            # -----------------------------------------------------------------
+            # 四、blend / relative_blend 演示
+            # -----------------------------------------------------------------
+            print("\n[10] MovL + blend=10  (平滑过渡，不停留)")
+            robot.MovL(line_p1, speed=150, acceleration=500, blend=10)
+            wait_idle(robot)
+
+            print("\n[11] MovL + blend=None  (无过渡，精确到达)")
+            robot.MovL(line_p2, speed=150, acceleration=500)
+            wait_idle(robot)
+
+            print("\n[12] MovJ + relative_blend=0.5  (相对平滑)")
+            robot.MovJ(joint_pose, speed=40, acceleration=100, relative_blend=0.5)
+            wait_idle(robot)
+
+            print("\n[13] Move(path) + blend/relative_blend 混合")
+            path_blend = [
+                MoveInstruction.MovJ(joint_pose, speed=40, acc=100),
+                MoveInstruction.MovL(line_p1, speed=150, acc=500, blend=15),
+                MoveInstruction.MovL(line_p2, speed=150, acc=500, relative_blend=0.3),
+                MoveInstruction.MovL(joint_home, speed=150, acc=500),  # 精确到达
+            ]
+            robot.Move(path_blend)
+            wait_idle(robot)
+
+            PrintBanner("08 — 完成", subtitle="四组合 + MovC + Sync + blend 演示")
             time.sleep(1)
     except KeyboardInterrupt:
         return 130
