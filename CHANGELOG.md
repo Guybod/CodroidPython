@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.1.4 — blend 参数改为可选
+
+### Breaking Changes
+
+- **`blend` 参数类型变更**：`float`（默认 `0.0`）→ `Optional[float]`（默认 `None`）
+  - 之前不传 `blend` 会发送 `0.0` 到控制器，现在不传表示**无过渡**
+  - 如需保持旧行为，请显式传入 `blend=0`
+- **`relative_blend` 参数类型变更**：`int`（默认 `0`）→ `Optional[float]`（默认 `None`）
+- **`blend` 与 `relative_blend` 互斥**：同时传入时 `relative_blend` 无效
+- **`coor`/`tool` 语义明确**：`None` 表示指令中不包含该字段
+
+### 涉及方法
+
+- `MoveInstruction` 工厂方法：`MovJ`、`MovL`、`MovC`、`MovCircle`
+- `MotionPath`：`MovJ`、`MovL`、`MovC`
+- `CodroidClient`：`MovJ`、`MovL`、`MovC`、`MovCircle` 及其 `*Sync` 变体
+
+---
+
 ## 2.1.2 — 阻塞式运动 API / RunScript 完整参数 / StopMoveTo
 
 ### Added

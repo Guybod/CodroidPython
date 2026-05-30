@@ -1,45 +1,45 @@
-# CodroidPython SDK 手册
+# CodroidPython SDK Manual
 
-**版本:** 2.1.2 | **包名:** `codroid-robot-sdk` | **Python:** 3.7+
-
----
-
-## 目录
-
-| # | 章节 | 说明 |
-|---|------|------|
-| 1 | [快速上手](#快速上手) | 安装、连接并运行第一个程序 |
-| 2 | [核心概念](#核心概念) | 生命周期、TCP 模型、单位约定、异常处理 |
-| 3 | [CodroidSession / CodroidClient API](#codroidsession--codroidclient-api-参考) | 主客户端完整 API 参考 |
-| 4 | [运动 API](#运动-api-参考) | JointPoint、CartesianPoint、MoveInstruction、MotionWaitOptions |
-| 5 | [数据类型与枚举](#数据类型与枚举) | CommonResponse、CriRealTimeData、RobotFrame、GlobalVariable |
-| 6 | [CRI 实时数据与控制](#cri-实时数据与控制-api-参考) | CriRealtimeDispatcher、TrajectoryGenerator、PacketParser |
-| 7 | [IO 与寄存器](#io-与寄存器-api-参考) | DI/DO/AI/AO 操作、寄存器读写 |
-| 8 | [辅助工具](#辅助工具-api-参考) | 发布/订阅、全局变量、运动学、ConsoleUtf8 |
+**Version:** 2.1.4 | **Package:** `codroid-robot-sdk` | **Python:** 3.7+
 
 ---
 
-## 环境要求
+## Table of Contents
 
-| 项目 | 要求 |
-|------|------|
-| Python | 3.7+（CPython / PyPy，3.7 ~ 3.14） |
-| 操作系统 | Linux、Windows、macOS |
-| 运行时依赖 | 无（可选 `colorama` 用于彩色终端输出） |
+| # | Chapter | Description |
+|---|---------|-------------|
+| 1 | [Quick Start](#quick-start) | Install, connect, and run your first program |
+| 2 | [Core Concepts](#core-concepts) | Lifecycle, TCP model, unit conventions, error handling |
+| 3 | [CodroidSession / CodroidClient API](#codroidsession--codroidclient-api-reference) | Main client full API reference |
+| 4 | [Motion API](#motion-api-reference) | JointPoint, CartesianPoint, MoveInstruction, MotionWaitOptions |
+| 5 | [Data Types & Enums](#data-types--enums) | CommonResponse, CriRealTimeData, RobotFrame, GlobalVariable |
+| 6 | [CRI Real-time Data & Control](#cri-real-time-data--control-api-reference) | CriRealtimeDispatcher, TrajectoryGenerator, PacketParser |
+| 7 | [IO & Registers](#io--registers-api-reference) | DI/DO/AI/AO operations, register read/write |
+| 8 | [Utilities](#utilities-api-reference) | Publish/Subscribe, global variables, kinematics, ConsoleUtf8 |
 
-### 安装
+---
+
+## Requirements
+
+| Item | Requirement |
+|------|-------------|
+| Python | 3.7+ (CPython / PyPy, 3.7 ~ 3.14) |
+| OS | Linux, Windows, macOS |
+| Runtime deps | None (optional `colorama` for colored terminal output) |
+
+### Install
 
 ```bash
 pip install codroid-robot-sdk
 ```
 
-可选彩色终端输出：
+Optional colored terminal output:
 
 ```bash
 pip install "codroid-robot-sdk[color]"
 ```
 
-### 验证安装
+### Verify Installation
 
 ```bash
 python3 -c "import codroid; print(codroid.__version__)"
@@ -47,45 +47,45 @@ python3 -c "import codroid; print(codroid.__version__)"
 
 ---
 
-## API 命名约定
+## API Naming Convention
 
-所有公共方法使用 **PascalCase**（与 C# / C++ SDK 一致）。
+All public methods use **PascalCase** (consistent with C# / C++ SDKs).
 
 ```python
-# 正确
+# Correct
 robot.ConnectRemoteAndSwitchOn()
 di = robot.GetDi(0)
 
-# 错误 — snake_case 已在 2.1.1 移除
-robot.connect_remote_and_switch_on()  # 不存在
+# Wrong — snake_case removed in 2.1.1
+robot.connect_remote_and_switch_on()  # does not exist
 ```
 
 ---
 
-## 单位约定
+## Unit Conventions
 
-| 层级 | 线性 | 角度 |
-|------|------|------|
-| SDK 公共 API | **mm** | **deg（度）** |
-| TCP JSON 协议 | **mm** | **deg** |
-| CRI UDP 二进制（线路层） | **m** | **rad（弧度）** |
-| `CriRealTimeData`（已解析） | **mm** | **deg** |
+| Layer | Linear | Angular |
+|-------|--------|---------|
+| SDK public API | **mm** | **deg (degrees)** |
+| TCP JSON protocol | **mm** | **deg** |
+| CRI UDP binary (wire) | **m** | **rad (radians)** |
+| `CriRealTimeData` (parsed) | **mm** | **deg** |
 
-`CriRealtimePacketParser.parse()` 和 `CriRealtimeDispatcher`（`convert_to_si=True`）会自动处理 m 与 mm、rad 与 deg 的换算。
+`CriRealtimePacketParser.parse()` and `CriRealtimeDispatcher` (`convert_to_si=True`) automatically handle m↔mm and rad↔deg conversion.
 
 <div style="page-break-after: always;"></div>
 
-## 快速上手
+## Quick Start
 
-### 安装
+### Install
 
-#### 通过 pip 安装
+#### Via pip
 
 ```bash
 pip install codroid-robot-sdk
 ```
 
-#### 从源码安装
+#### From Source
 
 ```bash
 git clone https://github.com/guybod/CodroidSDK.git
@@ -95,14 +95,14 @@ pip install -e .
 
 ---
 
-### 最小示例
+### Minimal Example
 
-连接控制器，进入远程模式，上使能。
+Connect to the controller, enter remote mode, and enable.
 
 ```python
 from codroid import CodroidControlInterface, InitConsoleUtf8
 
-InitConsoleUtf8()  # Windows cmd 下中文日志不乱码；Linux 上为 no-op
+InitConsoleUtf8()  # Windows cmd UTF-8 fix; no-op on Linux
 
 ROBOT_IP = "192.168.1.136"
 
@@ -111,7 +111,7 @@ with CodroidControlInterface(host=ROBOT_IP) as robot:
     robot.SwitchOn()
 ```
 
-运行：
+Run:
 
 ```bash
 python3 demo.py
@@ -119,7 +119,7 @@ python3 demo.py
 
 ---
 
-### 完整工作流示例
+### Complete Workflow Example
 
 ```python
 from codroid import (
@@ -135,31 +135,31 @@ InitConsoleUtf8()
 ROBOT_IP = "192.168.1.136"
 
 with CodroidControlInterface(host=ROBOT_IP) as robot:
-    # 1. 连接并上电
+    # 1. Connect and power on
     robot.EnterRemoteModeViaAuto()
     robot.SwitchOn()
 
-    # 2. IO 操作
+    # 2. IO operations
     di0 = robot.GetDi(0)
     robot.SetDo(10, di0)
 
-    # 3. 寄存器
+    # 3. Registers
     reg_val = robot.GetRegisterValue(0)
     robot.SetRegisterValue(0, reg_val + 1)
 
-    # 4. 关节运动
+    # 4. Joint motion
     robot.MovJ(JointPoint.Degrees([0, 0, 90, 0, 90, 0]), speed=40, acceleration=100)
 
-    # 5. 直线运动
+    # 5. Linear motion
     robot.MovL(CartesianPoint.MmDeg([400, 200, 500, 180, 0, 90]),
                speed=150, acceleration=500)
 ```
 
 ---
 
-### 使用 CodroidClient
+### Using CodroidClient
 
-`CodroidClient` 继承自 `CodroidSession`，使用后台线程接收数据，支持 publish/subscribe 事件分发。
+`CodroidClient` inherits from `CodroidSession`, uses a background thread for receiving data, and supports publish/subscribe event dispatch.
 
 ```python
 from codroid import CodroidClient, InitConsoleUtf8
@@ -173,34 +173,34 @@ with CodroidClient(host="192.168.1.136") as robot:
 
 ---
 
-### 运行示例项目
+### Running Examples
 
 ```bash
-# 基本用法
+# Basic usage
 PYTHONPATH=src python examples/01_basic_usage.py --robot 192.168.8.136
 
-# 运动示例
+# Motion examples
 PYTHONPATH=src python examples/08_move.py --robot 192.168.8.136
 
-# 阻塞式运动
+# Blocking motion
 PYTHONPATH=src python examples/15_sync_motion.py --robot 192.168.8.136
 
-# 机器人设置
+# Robot settings
 PYTHONPATH=src python examples/14_robot_parameters.py --robot 192.168.8.136
 ```
 
 ---
 
-### 错误处理
+### Error Handling
 
-所有 TCP 指令在失败时抛出异常：
+All TCP commands throw exceptions on failure:
 
-| 异常 | 条件 |
-|------|------|
-| `CodroidError` | 基础异常类 |
-| `CodroidCommandException` | 控制器返回 `err` 字段 |
-| `CodroidNetworkError` | TCP 连接或通信失败 |
-| `CodroidTimeoutError` | 操作超时 |
+| Exception | Condition |
+|-----------|-----------|
+| `CodroidError` | Base exception |
+| `CodroidCommandException` | Controller returned `err` field |
+| `CodroidNetworkError` | TCP connection or communication failure |
+| `CodroidTimeoutError` | Operation timeout |
 
 ```python
 from codroid import CodroidControlInterface, CodroidError, CodroidTimeoutError
@@ -211,16 +211,16 @@ try:
         robot.SwitchOn()
         robot.MovJ([0, 0, 90, 0, 90, 0], speed=40, acceleration=100)
 except CodroidTimeoutError:
-    print("操作超时")
+    print("Operation timed out")
 except CodroidError as e:
-    print(f"SDK 错误: {e}")
+    print(f"SDK error: {e}")
 ```
 
 ---
 
-### Windows 控制台 UTF-8
+### Windows Console UTF-8
 
-在 `cmd`（非 Windows Terminal）下运行含中文的示例时，请在入口调用：
+When running examples with Chinese characters in `cmd` (not Windows Terminal), call at entry:
 
 ```python
 from codroid import InitConsoleUtf8
@@ -228,74 +228,74 @@ from codroid import InitConsoleUtf8
 InitConsoleUtf8()
 ```
 
-所有 `examples/*.py` 已在 `if __name__ == "__main__"` 首行调用。自建 CLI 请同样处理；`chcp 65001` 不能替代此调用。Linux / macOS 上为 no-op。
+All `examples/*.py` call this at the top of `if __name__ == "__main__"`. No-op on Linux / macOS.
 
 <div style="page-break-after: always;"></div>
 
-## 核心概念
+## Core Concepts
 
-### 客户端生命周期
+### Client Lifecycle
 
-`CodroidSession`（别名 `CodroidControlInterface`）和 `CodroidClient` 的典型生命周期：
+Typical lifecycle for `CodroidSession` (alias `CodroidControlInterface`) and `CodroidClient`:
 
 ```python
 from codroid import CodroidClient
 
-# 方式一：with 语句（推荐）
+# Option 1: with statement (recommended)
 with CodroidClient(host="192.168.1.136") as robot:
     robot.EnterRemoteModeViaAuto()
     robot.SwitchOn()
-    # ... 使用 API ...
-# 自动调用 Disconnect()
+    # ... use API ...
+# Disconnect() called automatically
 
-# 方式二：手动管理
+# Option 2: manual management
 robot = CodroidClient(host="192.168.1.136")
 robot.Connect()
 try:
     robot.EnterRemoteModeViaAuto()
     robot.SwitchOn()
-    # ... 使用 API ...
+    # ... use API ...
 finally:
     robot.Disconnect()
 ```
 
 ### CodroidSession vs CodroidClient
 
-| 特性 | CodroidSession | CodroidClient |
-|------|---------------|---------------|
-| 传输层 | `JsonStreamClient`（同步阻塞） | `TransportClient`（后台线程） |
-| 请求/响应匹配 | 同步发送-接收 | 异步 ID 匹配 |
-| Publish/Subscribe | 不支持 | 支持 |
-| 适用场景 | 简单脚本、一次性操作 | 持续收包、事件驱动 |
+| Feature | CodroidSession | CodroidClient |
+|---------|---------------|---------------|
+| Transport | `JsonStreamClient` (sync blocking) | `TransportClient` (background thread) |
+| Request/Response matching | Sync send-receive | Async ID matching |
+| Publish/Subscribe | Not supported | Supported |
+| Use case | Simple scripts, one-shot ops | Continuous receive, event-driven |
 
 ---
 
-### TCP 命令模型
+### TCP Command Model
 
-SDK 通过 TCP JSON 与控制器通信。每条指令的流程：
+SDK communicates with the controller via TCP JSON. Each command flow:
 
-1. SDK 分配自增 `id`
-2. 发送请求：`{"id": N, "ty": "command/path", "db": {...}}`
-3. 控制器响应：`{"id": N, "ty": "...", "db": {...}, "err": ...}`
-4. SDK 按 `id` 匹配请求与响应
+1. SDK assigns auto-incrementing `id`
+2. Sends request: `{"id": N, "ty": "command/path", "db": {...}}`
+3. Controller responds: `{"id": N, "ty": "...", "db": {...}, "err": ...}`
+4. SDK matches request and response by `id`
 
 ```python
-# SDK 内部自动处理 id 分配和匹配
+# SDK handles id assignment and matching internally
 response = robot._send_command("Robot/switchOn", "")
 # response = CommonResponse(id=1, ty="Robot/switchOn", db=None, err=None)
 ```
 
 #### CommonResponse
 
-所有 TCP 指令返回 `CommonResponse`：
+All TCP commands return `CommonResponse`:
 
 ```python
 @dataclass
 class CommonResponse:
-    id: Union[int, str]   # 请求 ID
-    ty: str               # 响应类型
-    db: Optional[Any]     # 响应数据
-    err: Optional[Any]    # 错误信息（None 表示成功）
+    id: Union[int, str]   # Request ID
+    ty: str               # Response type
+    db: Optional[Any]     # Response data
+    err: Optional[Any]    # Error info (None means success)
 
     @property
     def is_success(self) -> bool:
@@ -304,16 +304,16 @@ class CommonResponse:
 
 ---
 
-### 异常处理
+### Error Handling
 
-SDK 定义了四种异常类型：
+SDK defines four exception types:
 
-| 异常 | 触发条件 |
-|------|----------|
-| `CodroidError` | 基础异常类；参数校验失败、非法操作 |
-| `CodroidCommandException` | 控制器返回 `err` 字段（协议层错误） |
-| `CodroidNetworkError` | TCP 连接失败、通信中断 |
-| `CodroidTimeoutError` | 操作超时（连接、CRI 等待、阻塞运动） |
+| Exception | Trigger |
+|-----------|---------|
+| `CodroidError` | Base exception; parameter validation failure, illegal operations |
+| `CodroidCommandException` | Controller returned `err` field (protocol-level error) |
+| `CodroidNetworkError` | TCP connection failure, communication interruption |
+| `CodroidTimeoutError` | Operation timeout (connection, CRI wait, blocking motion) |
 
 ```python
 from codroid import (
@@ -327,59 +327,59 @@ try:
     with CodroidClient(host="192.168.1.136") as robot:
         robot.ConnectRemoteAndSwitchOn()
 except CodroidNetworkError:
-    print("无法连接控制器")
+    print("Cannot connect to controller")
 except CodroidTimeoutError:
-    print("连接超时")
+    print("Connection timed out")
 except CodroidCommandException as e:
-    print(f"控制器错误: {e}")
+    print(f"Controller error: {e}")
 except CodroidError as e:
-    print(f"SDK 错误: {e}")
+    print(f"SDK error: {e}")
 ```
 
 ---
 
-### 线程安全
+### Thread Safety
 
-- `CriData` 属性返回当前缓存的 CRI 快照，可从任意线程读取。
-- TCP 方法（`GetDi`、`MovJ` 等）可从任意线程调用，但同一客户端实例不支持并发调用。
-- `CriRealtimeDispatcher` 的 `SendCommand` / `SendTrajectory` 是线程安全的（UDP 无状态）。
+- `CriData` property returns the current cached CRI snapshot, readable from any thread.
+- TCP methods (`GetDi`, `MovJ`, etc.) can be called from any thread, but concurrent calls on the same client instance are not supported.
+- `CriRealtimeDispatcher`'s `SendCommand` / `SendTrajectory` are thread-safe (UDP is stateless).
 
 ---
 
 ### Publish / Subscribe
 
-`CodroidClient` 支持订阅控制器推送的事件主题：
+`CodroidClient` supports subscribing to controller push event topics:
 
 ```python
 from codroid import CodroidClient, PublishTopics
 
 def on_robot_status(notification):
-    print(f"收到 {notification.ty}: {notification.db}")
+    print(f"Received {notification.ty}: {notification.db}")
 
 with CodroidClient(host="192.168.1.136") as robot:
     sub = robot.SubscribePublishTopic(PublishTopics.ROBOT_STATUS, on_robot_status)
-    # ... 运行 ...
-    sub.dispose()  # 取消订阅
+    # ... run ...
+    sub.dispose()  # Unsubscribe
 ```
 
-可用主题见 `PublishTopics` 常量：
-- `PROJECT_STATE` — 工程状态变更
-- `VAR_UPDATE` — 变量更新
-- `ROBOT_STATUS` — 机器人状态
-- `ROBOT_POSTURE` — 机器人姿态
-- `ROBOT_COORDINATE` — 机器人坐标
-- `LOG` — 日志
-- `ERROR` — 错误
+Available topics in `PublishTopics`:
+- `PROJECT_STATE` — Project state change
+- `VAR_UPDATE` — Variable update
+- `ROBOT_STATUS` — Robot status
+- `ROBOT_POSTURE` — Robot posture
+- `ROBOT_COORDINATE` — Robot coordinate
+- `LOG` — Log
+- `ERROR` — Error
 
 <div style="page-break-after: always;"></div>
 
-## CodroidSession / CodroidClient API 参考
+## CodroidSession / CodroidClient API Reference
 
-`CodroidSession`（别名 `CodroidControlInterface`）是主会话类，封装了全部 TCP 指令。`CodroidClient` 继承它并替换传输层，增加 publish/subscribe 能力。
+`CodroidSession` (alias `CodroidControlInterface`) is the main session class encapsulating all TCP commands. `CodroidClient` inherits it and replaces the transport layer, adding publish/subscribe capabilities.
 
 ---
 
-### 构造函数
+### Constructor
 
 #### CodroidSession
 
@@ -392,12 +392,12 @@ CodroidSession(
 )
 ```
 
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `host` | `str` | `"192.168.1.136"` | 控制器 IP 地址 |
-| `port` | `int` | `9001` | TCP 端口 |
-| `local_ip` | `str` | `"192.168.1.150"` | 本机 IP（CRI UDP 推送用） |
-| `udp_port` | `int` | `10086` | 本机 UDP 监听端口 |
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `host` | `str` | `"192.168.1.136"` | Controller IP address |
+| `port` | `int` | `9001` | TCP port |
+| `local_ip` | `str` | `"192.168.1.150"` | Local IP (for CRI UDP push) |
+| `udp_port` | `int` | `10086` | Local UDP listening port |
 
 #### CodroidClient
 
@@ -411,15 +411,15 @@ CodroidClient(
 )
 ```
 
-额外参数：
+Additional parameter:
 
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `timeout` | `float` | `10.0` | TCP 请求超时（秒） |
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `timeout` | `float` | `10.0` | TCP request timeout (seconds) |
 
 ---
 
-### 属性
+### Properties
 
 #### CriData
 
@@ -428,20 +428,20 @@ CodroidClient(
 def CriData(self) -> Optional[CriRealTimeData]
 ```
 
-最新的 CRI 实时数据快照。需要先调用 `StartListenUdp()` 或 `StartCriDataPush()` 开始接收 UDP 数据。
+Latest CRI real-time data snapshot. Requires calling `StartListenUdp()` or `StartCriDataPush()` first.
 
 ```python
 robot.StartListenUdp()
 robot.WaitForCriData()
 data = robot.CriData
-print(f"关节角: {data.joint_position}")
-print(f"TCP 位姿: {data.tcp_pose}")
-print(f"是否运动中: {data.status.is_moving}")
+print(f"Joint angles: {data.joint_position}")
+print(f"TCP pose: {data.tcp_pose}")
+print(f"Is moving: {data.status.is_moving}")
 ```
 
 ---
 
-### 连接管理
+### Connection Management
 
 #### Connect
 
@@ -449,7 +449,7 @@ print(f"是否运动中: {data.status.is_moving}")
 def Connect(self) -> CodroidSession
 ```
 
-建立 TCP 连接。返回自身以支持链式调用。使用 `with` 语句时自动调用。
+Establish TCP connection. Returns self for chaining. Called automatically with `with` statement.
 
 #### Disconnect
 
@@ -457,11 +457,11 @@ def Connect(self) -> CodroidSession
 def Disconnect(self) -> None
 ```
 
-断开 TCP 连接并停止 CRI 接收。使用 `with` 语句时自动调用。
+Disconnect TCP and stop CRI receive. Called automatically with `with` statement.
 
 ---
 
-### 便捷连接
+### Convenience Connect
 
 #### ConnectRemoteAndSwitchOn
 
@@ -469,7 +469,7 @@ def Disconnect(self) -> None
 def ConnectRemoteAndSwitchOn(self) -> CommonResponse
 ```
 
-组合操作：`EnterRemoteModeViaAuto()` → `SwitchOn()`。须先 `Connect()` 或在 `with` 块内。
+Combined operation: `EnterRemoteModeViaAuto()` → `SwitchOn()`. Must `Connect()` first or be inside `with` block.
 
 ```python
 with CodroidClient(host="192.168.1.136") as robot:
@@ -482,7 +482,7 @@ with CodroidClient(host="192.168.1.136") as robot:
 def EnterRemoteModeViaAuto(self) -> CommonResponse
 ```
 
-先 `ToAuto()` 再 `ToRemote()`。
+Calls `ToAuto()` then `ToRemote()`.
 
 #### EnterManualModeViaAuto
 
@@ -490,11 +490,11 @@ def EnterRemoteModeViaAuto(self) -> CommonResponse
 def EnterManualModeViaAuto(self) -> CommonResponse
 ```
 
-先 `ToAuto()` 再 `ToManual()`。
+Calls `ToAuto()` then `ToManual()`.
 
 ---
 
-### 模式切换
+### Mode Switching
 
 #### SwitchOn / SwitchOff
 
@@ -503,7 +503,7 @@ def SwitchOn(self) -> CommonResponse
 def SwitchOff(self) -> CommonResponse
 ```
 
-上使能 / 下使能。
+Enable / disable the robot.
 
 #### ToRemote / ToManual / ToAuto
 
@@ -513,7 +513,7 @@ def ToManual(self) -> CommonResponse
 def ToAuto(self) -> CommonResponse
 ```
 
-切换到远程 / 手动 / 自动模式。
+Switch to remote / manual / auto mode.
 
 #### ToSimulation / ToActual
 
@@ -522,7 +522,7 @@ def ToSimulation(self) -> CommonResponse
 def ToActual(self) -> CommonResponse
 ```
 
-切换到仿真 / 实机模式。
+Switch to simulation / actual mode.
 
 #### StartDrag / StopDrag
 
@@ -531,7 +531,7 @@ def StartDrag(self) -> CommonResponse
 def StopDrag(self) -> CommonResponse
 ```
 
-进入 / 退出拖拽示教模式。仅在远程模式和手动模式下可用。
+Enter / exit drag-and-teach mode. Only available in remote or manual mode.
 
 #### ClearSystemError
 
@@ -539,11 +539,11 @@ def StopDrag(self) -> CommonResponse
 def ClearSystemError(self) -> CommonResponse
 ```
 
-清除系统错误。
+Clear system errors.
 
 ---
 
-### 非阻塞运动指令
+### Non-Blocking Motion Commands
 
 #### MovJ
 
@@ -559,16 +559,16 @@ def MovJ(
 ) -> CommonResponse
 ```
 
-关节插补运动。目标可为 `JointPoint`（发 jp）或 `CartesianPoint`（发 cp+rj）。
+Joint interpolation motion. Target can be `JointPoint` (sends jp) or `CartesianPoint` (sends cp+rj).
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `target` | `JointPoint` / `CartesianPoint` | 运动目标 |
-| `speed` | `float` | 速度 |
-| `acceleration` | `float` | 加速度 |
-| `blend` | `Optional[float]` | 平滑半径。与 `relative_blend` 互斥——同时传入时 `relative_blend` 无效。不传表示无过渡 |
-| `coor` | `Optional[Sequence[float]]` | 用户坐标系 `[x,y,z,a,b,c]`。None 时指令中不包含该字段 |
-| `tool` | `Optional[Sequence[float]]` | 工具坐标系 `[x,y,z,a,b,c]`。None 时指令中不包含该字段 |
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `target` | `JointPoint` / `CartesianPoint` | Motion target |
+| `speed` | `float` | Speed |
+| `acceleration` | `float` | Acceleration |
+| `blend` | `float` | Blend radius, default 0 (exact arrival) |
+| `coor` | `Sequence[float]` | User coordinate `[x,y,z,a,b,c]` |
+| `tool` | `Sequence[float]` | Tool coordinate `[x,y,z,a,b,c]` |
 
 ```python
 robot.MovJ(JointPoint.Degrees([0, 0, 90, 0, 90, 0]), speed=40, acceleration=100)
@@ -589,7 +589,7 @@ def MovL(
 ) -> CommonResponse
 ```
 
-直线插补运动。目标可为 `CartesianPoint` 或 `JointPoint`。
+Linear interpolation motion. Target can be `CartesianPoint` or `JointPoint`.
 
 #### MovC
 
@@ -606,7 +606,7 @@ def MovC(
 ) -> CommonResponse
 ```
 
-圆弧运动。中间点与目标均为 `CartesianPoint`。
+Circular arc motion. Both middle and target are `CartesianPoint`.
 
 #### MovCircle
 
@@ -624,7 +624,7 @@ def MovCircle(
 ) -> CommonResponse
 ```
 
-整圆运动。`circle_num` 为圈数。
+Full circle motion. `circle_num` is the number of revolutions.
 
 #### Move
 
@@ -635,7 +635,7 @@ def Move(
 ) -> CommonResponse
 ```
 
-多段路径执行。推荐使用 `List[MoveInstruction]`。
+Multi-segment path execution. `List[MoveInstruction]` is recommended.
 
 ```python
 path = [
@@ -648,9 +648,9 @@ robot.Move(path)
 
 ---
 
-### 阻塞式运动指令
+### Blocking Motion Commands
 
-`*Sync` 方法发送运动指令后自动轮询 CRI 数据，直到机器人稳定到达目标。需要先启动 CRI 数据推送。
+`*Sync` methods send the motion command then automatically poll CRI data until the robot stably reaches the target. CRI data push must be started first.
 
 #### MovJSync
 
@@ -667,7 +667,7 @@ def MovJSync(
 ) -> bool
 ```
 
-阻塞式关节运动。到达目标返回 `True`。
+Blocking joint motion. Returns `True` on reaching the target.
 
 ```python
 robot.StartListenUdp()
@@ -690,7 +690,7 @@ def MovLSync(
 ) -> bool
 ```
 
-阻塞式直线运动。
+Blocking linear motion.
 
 #### MovCSync
 
@@ -708,7 +708,7 @@ def MovCSync(
 ) -> bool
 ```
 
-阻塞式圆弧运动。
+Blocking circular arc motion.
 
 #### MovCircleSync
 
@@ -727,7 +727,7 @@ def MovCircleSync(
 ) -> bool
 ```
 
-阻塞式整圆运动。
+Blocking full circle motion.
 
 #### MoveSync
 
@@ -739,22 +739,22 @@ def MoveSync(
 ) -> bool
 ```
 
-阻塞式路径执行。等待 CRI 确认最后一段到达目标。
+Blocking path execution. Waits for CRI to confirm the last segment reached the target.
 
 #### MotionWaitOptions
 
-控制阻塞运动的等待行为：
+Controls blocking motion wait behavior:
 
 ```python
 @dataclass
 class MotionWaitOptions:
-    timeout: float = 60.0                           # 整体超时（秒）
-    poll_interval: float = 0.05                     # 轮询间隔（秒）
-    cri_stale_timeout: float = 0.5                  # CRI 数据过期判定（秒）
-    settled_samples: int = 3                        # 连续稳定采样数
-    joint_tolerance_deg: float = 0.2                # 关节容差（度）
-    cartesian_position_tolerance_mm: float = 1.0    # 笛卡尔位置容差（mm）
-    cartesian_orientation_tolerance_deg: float = 1.0 # 笛卡尔姿态容差（度）
+    timeout: float = 60.0                              # Overall timeout (seconds)
+    poll_interval: float = 0.05                        # Poll interval (seconds)
+    cri_stale_timeout: float = 0.5                     # CRI data stale threshold (seconds)
+    settled_samples: int = 3                           # Consecutive settled sample count
+    joint_tolerance_deg: float = 0.2                   # Joint tolerance (degrees)
+    cartesian_position_tolerance_mm: float = 1.0       # Cartesian position tolerance (mm)
+    cartesian_orientation_tolerance_deg: float = 1.0   # Cartesian orientation tolerance (degrees)
 ```
 
 ```python
@@ -767,7 +767,7 @@ robot.MovJSync(JointPoint.Degrees([0, 0, 90, 0, 90, 0]),
 
 ---
 
-### 运动控制
+### Motion Control
 
 #### PauseRobotMotion / ResumeRobotMotion
 
@@ -776,7 +776,7 @@ def PauseRobotMotion(self) -> CommonResponse
 def ResumeRobotMotion(self) -> CommonResponse
 ```
 
-暂停 / 恢复当前运动。
+Pause / resume current motion.
 
 #### StopRobotMove
 
@@ -784,11 +784,11 @@ def ResumeRobotMotion(self) -> CommonResponse
 def StopRobotMove(self) -> CommonResponse
 ```
 
-停止当前运动。
+Stop current motion.
 
 ---
 
-### MoveTo 指令
+### MoveTo Commands
 
 #### MoveTo
 
@@ -800,27 +800,27 @@ def MoveTo(
 ) -> CommonResponse
 ```
 
-运动到预设位置。`MoveToType` 枚举值：
+Move to a preset position. `MoveToType` enum values:
 
-| 值 | 说明 |
-|----|------|
-| `STOP` (-1) | 停止 MoveTo |
-| `HOME` (0) | Home 点 |
-| `SAFE` (1) | 安全位 |
-| `CANDLE` (2) | 蜡烛位 |
-| `PACK` (3) | 打包位 |
-| `JOINT` (4) | 关节规划到指定目标 |
-| `LINEAR` (5) | 直线规划到指定目标 |
-| `RESUME` (6) | 程序恢复点 |
+| Value | Description |
+|-------|-------------|
+| `STOP` (-1) | Stop MoveTo |
+| `HOME` (0) | Home position |
+| `SAFE` (1) | Safe position |
+| `CANDLE` (2) | Candle position |
+| `PACK` (3) | Pack position |
+| `JOINT` (4) | Joint planned to target |
+| `LINEAR` (5) | Linear planned to target |
+| `RESUME` (6) | Program resume point |
 
 ```python
 from codroid import MoveToType
 
-robot.MoveTo(MoveToType.HOME)  # 回 Home
-robot.MoveTo(MoveToType.SAFE)  # 回安全位
+robot.MoveTo(MoveToType.HOME)  # Go to Home
+robot.MoveTo(MoveToType.SAFE)  # Go to Safe
 ```
 
-启动后须每 0.5s 调用 `MoveToHeartbeat()`。
+Must call `MoveToHeartbeat()` every 0.5s during MoveTo motion.
 
 #### MoveToHeartbeat
 
@@ -828,7 +828,7 @@ robot.MoveTo(MoveToType.SAFE)  # 回安全位
 def MoveToHeartbeat(self) -> CommonResponse
 ```
 
-MoveTo 心跳。须在 MoveTo 运动期间每隔 0.5s 调用一次。
+MoveTo heartbeat. Must be called every 0.5s during MoveTo motion.
 
 #### StopMoveTo
 
@@ -836,11 +836,11 @@ MoveTo 心跳。须在 MoveTo 运动期间每隔 0.5s 调用一次。
 def StopMoveTo(self) -> CommonResponse
 ```
 
-停止当前 MoveTo 运动。
+Stop current MoveTo motion.
 
 ---
 
-### Jog 指令
+### Jog Commands
 
 #### StartJog
 
@@ -855,20 +855,20 @@ def StartJog(
 ) -> CommonResponse
 ```
 
-启动点动。
+Start jogging.
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `mode` | `JogMode` | `JOINT`(1) 关节点动 / `LINEAR`(2) 直线点动 |
-| `index` | `int` | 关节序号(1-6) 或直线轴序号(1-6 对应 xyzabc) |
-| `speed` | `float` | 速度 (-1.0 ~ 1.0) |
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `mode` | `JogMode` | `JOINT`(1) joint jog / `LINEAR`(2) linear jog |
+| `index` | `int` | Joint number (1-6) or linear axis (1-6 for xyzabc) |
+| `speed` | `float` | Speed (-1.0 ~ 1.0) |
 | `coor_type` | `JogCoorType` | `USER`(0) / `TOOL`(1) |
-| `coor_id` | `int` | 用户坐标系 ID |
+| `coor_id` | `int` | User coordinate ID |
 
 ```python
 from codroid import JogMode
 
-robot.StartJog(JogMode.JOINT, index=1, speed=0.5)  # 关节 1 正向点动
+robot.StartJog(JogMode.JOINT, index=1, speed=0.5)  # Joint 1 positive jog
 ```
 
 #### StopJog
@@ -877,7 +877,7 @@ robot.StartJog(JogMode.JOINT, index=1, speed=0.5)  # 关节 1 正向点动
 def StopJog(self) -> CommonResponse
 ```
 
-停止点动。
+Stop jogging.
 
 #### JogHeartbeat
 
@@ -885,11 +885,11 @@ def StopJog(self) -> CommonResponse
 def JogHeartbeat(self) -> CommonResponse
 ```
 
-点动心跳。须在点动期间每隔 0.5s 调用一次。
+Jog heartbeat. Must be called every 0.5s during jogging.
 
 ---
 
-### 速度倍率
+### Speed Rate
 
 #### SetManualMoveRate / SetAutoMoveRate
 
@@ -898,11 +898,11 @@ def SetManualMoveRate(self, rate: int) -> CommonResponse
 def SetAutoMoveRate(self, rate: int) -> CommonResponse
 ```
 
-设置手动 / 自动运动倍率。`rate` 范围 1~100。
+Set manual / auto move rate. `rate` range 1~100.
 
 ---
 
-### CRI 数据推送
+### CRI Data Push
 
 #### StartListenUdp
 
@@ -910,7 +910,7 @@ def SetAutoMoveRate(self, rate: int) -> CommonResponse
 def StartListenUdp(self) -> None
 ```
 
-一键启动 CRI 数据接收：先停止旧推送 → 启动本地 UDP 监听 → 通知控制器开始推送。
+One-click CRI data receive setup: stop old push → start local UDP listener → notify controller to start push.
 
 ```python
 robot.StartListenUdp()
@@ -924,7 +924,7 @@ data = robot.CriData
 def WaitForCriData(self, timeout: float = 5.0) -> CriRealTimeData
 ```
 
-等待第一个 CRI 数据包到达。超时抛出 `CodroidTimeoutError`。
+Wait for the first CRI data packet. Throws `CodroidTimeoutError` on timeout.
 
 #### StartCriDataPush
 
@@ -939,7 +939,7 @@ def StartCriDataPush(
 ) -> CommonResponse
 ```
 
-手动开启 CRI UDP 推送。`port` 范围 10000–65534。`duration` 为推送周期（ms）。
+Manually start CRI UDP push. `port` range 10000–65534. `duration` is push period (ms).
 
 #### StopCriDataPush
 
@@ -947,7 +947,7 @@ def StartCriDataPush(
 def StopCriDataPush(self, ip: Optional[str] = None, port: Optional[int] = None) -> CommonResponse
 ```
 
-停止 CRI 推送。
+Stop CRI push.
 
 #### StartCriControl
 
@@ -960,7 +960,7 @@ def StartCriControl(
 ) -> CommonResponse
 ```
 
-开启 CRI 实时控制模式。`duration` 为指令间隔（ms，1–16，且可整除 1000）。
+Start CRI real-time control mode. `duration` is command interval (ms, 1–16, must divide 1000).
 
 #### StopCriControl
 
@@ -968,19 +968,19 @@ def StartCriControl(
 def StopCriControl(self) -> CommonResponse
 ```
 
-关闭 CRI 实时控制。
+Stop CRI real-time control.
 
 ---
 
-### IO 操作
+### IO Operations
 
 #### GetDi / GetDo / GetAi / GetAo
 
 ```python
-def GetDi(self, port: int) -> int       # 数字输入，端口 0~15，返回 0 或 1
-def GetDo(self, port: int) -> int       # 数字输出，端口 0~15，返回 0 或 1
-def GetAi(self, port: int) -> float     # 模拟输入，端口 0~3
-def GetAo(self, port: int) -> float     # 模拟输出，端口 0~3
+def GetDi(self, port: int) -> int       # Digital input, port 0~15, returns 0 or 1
+def GetDo(self, port: int) -> int       # Digital output, port 0~15, returns 0 or 1
+def GetAi(self, port: int) -> float     # Analog input, port 0~3
+def GetAo(self, port: int) -> float     # Analog output, port 0~3
 ```
 
 ```python
@@ -992,7 +992,7 @@ ai0 = robot.GetAi(0)
 #### SetDo / SetAo
 
 ```python
-def SetDo(self, port: int, value: int) -> CommonResponse     # value: 0 或 1
+def SetDo(self, port: int, value: int) -> CommonResponse     # value: 0 or 1
 def SetAo(self, port: int, value: float) -> CommonResponse
 ```
 
@@ -1007,11 +1007,11 @@ robot.SetAo(0, 3.14)
 def GetIoValues(self, io_requests: List[Dict[str, Any]]) -> CommonResponse
 ```
 
-批量读取 IO。`io_requests` 格式：`[{"type": "DI", "port": 0}, ...]`。
+Batch read IO. `io_requests` format: `[{"type": "DI", "port": 0}, ...]`.
 
 ---
 
-### 寄存器操作
+### Register Operations
 
 #### GetRegisterValue / GetRegisterValues
 
@@ -1042,11 +1042,11 @@ def SetExtendArrayType(self, index: int, data_type: ExtendArrayType) -> CommonRe
 def RemoveExtendArray(self, index: int) -> CommonResponse
 ```
 
-设置 / 删除扩展数组数据类型。`index` 范围 0~999。
+Set / remove extended array data type. `index` range 0~999.
 
 ---
 
-### 机器人设置
+### Robot Settings
 
 #### GetRobotParameters
 
@@ -1054,12 +1054,12 @@ def RemoveExtendArray(self, index: int) -> CommonResponse
 def GetRobotParameters(self) -> RobotParameters
 ```
 
-获取设置界面参数快照。返回 `RobotParameters`，包含工具坐标系表、负载坐标系表、用户坐标系表及默认 ID。
+Get settings interface parameter snapshot. Returns `RobotParameters` containing tool frame table, payload frame table, coordinate frame table, and default IDs.
 
 ```python
 params = robot.GetRobotParameters()
-print(f"默认工具: {params.default_tool_id}")
-print(f"默认负载: {params.default_payload_id}")
+print(f"Default tool: {params.default_tool_id}")
+print(f"Default payload: {params.default_payload_id}")
 for frame in params.tool:
     print(f"  Tool[{frame.id}]: x={frame.x}, y={frame.y}, z={frame.z}")
 ```
@@ -1071,7 +1071,7 @@ def SetToolFrame(self, frame_id: int, frame) -> CommonResponse
 def SaveToolFrames(self, frames) -> CommonResponse
 ```
 
-`SetToolFrame` 修改单个工具坐标系（先读后改再保存，`frame_id` 仅允许 1~15）。`SaveToolFrames` 下发完整表（16 项，id=0 须全零）。
+`SetToolFrame` modifies a single tool frame (read-modify-write, `frame_id` 1~15 only). `SaveToolFrames` replaces the full table (16 items, id=0 must be all zeros).
 
 ```python
 from codroid import RobotFrame
@@ -1086,7 +1086,7 @@ def SetPayloadFrame(self, frame_id: int, frame) -> CommonResponse
 def SavePayloadFrames(self, frames) -> CommonResponse
 ```
 
-`SetPayloadFrame` 修改单个负载坐标系（`frame_id` 仅允许 1~15）。`SavePayloadFrames` 下发完整表。
+`SetPayloadFrame` modifies a single payload frame (`frame_id` 1~15 only). `SavePayloadFrames` replaces the full table.
 
 ```python
 from codroid import RobotPayloadFrame
@@ -1101,7 +1101,7 @@ def SetUserCoordinateFrame(self, frame_id: int, frame) -> CommonResponse
 def SaveUserCoordinateFrames(self, frames) -> CommonResponse
 ```
 
-修改单个 / 下发完整用户坐标系表。
+Modify single / replace full user coordinate frame table.
 
 #### SetDefaultToolId / SetDefaultPayloadId / SetDefaultUserCoordinateId
 
@@ -1111,7 +1111,7 @@ def SetDefaultPayloadId(self, payload_id: int) -> CommonResponse
 def SetDefaultUserCoordinateId(self, coordinate_id: int) -> CommonResponse
 ```
 
-设置默认工具 / 负载 / 用户坐标系编号。范围 0~15。
+Set default tool / payload / user coordinate ID. Range 0~15.
 
 #### SetCollisionSensitivity
 
@@ -1119,7 +1119,7 @@ def SetDefaultUserCoordinateId(self, coordinate_id: int) -> CommonResponse
 def SetCollisionSensitivity(self, sensitivity: int) -> CommonResponse
 ```
 
-设置碰撞检测灵敏度。范围 0~100。仅固件 2.3.2.10+ 可用。
+Set collision detection sensitivity. Range 0~100. Firmware 2.3.2.10+ only.
 
 #### SetPayload
 
@@ -1127,11 +1127,11 @@ def SetCollisionSensitivity(self, sensitivity: int) -> CommonResponse
 def SetPayload(self, payload_id: int) -> CommonResponse
 ```
 
-设置当前负载编号。仅固件 2.3.2.10+ 可用。
+Set current payload ID. Firmware 2.3.2.10+ only.
 
 ---
 
-### 项目与脚本
+### Project & Script
 
 #### RunScript
 
@@ -1146,7 +1146,7 @@ def RunScript(
 ) -> CommonResponse
 ```
 
-运行 Lua 脚本。
+Run Lua script.
 
 ```python
 robot.RunScript('print("hello")', vars={"speed": 100})
@@ -1160,7 +1160,7 @@ def RunByIndex(self, index: int) -> CommonResponse
 def RunStep(self, project_id: str) -> CommonResponse
 ```
 
-运行 / 单步运行工程。
+Run / single-step a project.
 
 #### PauseProject / ResumeProject / StopProject
 
@@ -1170,7 +1170,7 @@ def ResumeProject(self) -> CommonResponse
 def StopProject(self) -> CommonResponse
 ```
 
-暂停 / 恢复 / 停止工程。
+Pause / resume / stop a project.
 
 #### EnterRemoteScriptMode
 
@@ -1178,7 +1178,7 @@ def StopProject(self) -> CommonResponse
 def EnterRemoteScriptMode(self) -> CommonResponse
 ```
 
-进入远程脚本模式。
+Enter remote script mode.
 
 #### SetStartLine / ClearStartLine
 
@@ -1187,11 +1187,11 @@ def SetStartLine(self, line: int) -> CommonResponse
 def ClearStartLine(self) -> CommonResponse
 ```
 
-设置 / 清除启动行。
+Set / clear start line.
 
 ---
 
-### RS485 通信
+### RS485 Communication
 
 #### Rs485Init
 
@@ -1204,7 +1204,7 @@ def Rs485Init(
 ) -> CommonResponse
 ```
 
-初始化末端 RS485。
+Initialize end-effector RS485.
 
 ```python
 from codroid import RS485BaudRate
@@ -1218,7 +1218,7 @@ robot.Rs485Init(RS485BaudRate.B115200)
 def Rs485Flush(self) -> CommonResponse
 ```
 
-清空 RS485 读取缓存。
+Flush RS485 read buffer.
 
 #### Rs485Read
 
@@ -1226,7 +1226,7 @@ def Rs485Flush(self) -> CommonResponse
 def Rs485Read(self, length: int, timeout: int = 3000) -> CommonResponse
 ```
 
-读取 RS485 数据。`length` 最大 128 字节，`timeout` 最大 3000ms。
+Read RS485 data. `length` max 128 bytes, `timeout` max 3000ms.
 
 #### Rs485Write
 
@@ -1234,11 +1234,11 @@ def Rs485Read(self, length: int, timeout: int = 3000) -> CommonResponse
 def Rs485Write(self, data: Union[List[int], bytes]) -> CommonResponse
 ```
 
-发送 RS485 数据。最大 127 字节。
+Write RS485 data. Max 127 bytes.
 
 ---
 
-### 运动学
+### Kinematics
 
 #### AposToCpos
 
@@ -1252,7 +1252,7 @@ def AposToCpos(
 ) -> CommonResponse
 ```
 
-正解（关节 → 笛卡尔）。`jp` 为 6 个关节角（度）。
+Forward kinematics (joint → Cartesian). `jp` is 6 joint angles (degrees).
 
 #### CposToApos
 
@@ -1265,7 +1265,7 @@ def CposToApos(
 ) -> CommonResponse
 ```
 
-逆解（笛卡尔 → 关节）。`cp` 为 `[x,y,z,a,b,c]`，`rj` 为参考关节角（默认 `[20,20,20,20,20,20]`）。
+Inverse kinematics (Cartesian → joint). `cp` is `[x,y,z,a,b,c]`, `rj` is reference joint angles (default `[20,20,20,20,20,20]`).
 
 #### CalculateRelativePose
 
@@ -1280,11 +1280,11 @@ def CalculateRelativePose(
 ) -> CommonResponse
 ```
 
-笛卡尔坐标偏移计算。
+Cartesian coordinate offset calculation.
 
 ---
 
-### Publish / Subscribe（仅 CodroidClient）
+### Publish / Subscribe (CodroidClient only)
 
 #### SubscribePublishTopic
 
@@ -1297,7 +1297,7 @@ def SubscribePublishTopic(
 ) -> PublishTopicSubscription
 ```
 
-订阅控制器推送主题。返回 `PublishTopicSubscription`，调用 `.dispose()` 取消订阅。
+Subscribe to controller push topic. Returns `PublishTopicSubscription`, call `.dispose()` to unsubscribe.
 
 ```python
 from codroid import CodroidClient, PublishTopics
@@ -1307,41 +1307,41 @@ def on_status(notification):
 
 with CodroidClient(host="192.168.1.136") as robot:
     sub = robot.SubscribePublishTopic(PublishTopics.ROBOT_STATUS, on_status)
-    # ... 运行 ...
+    # ... run ...
     sub.dispose()
 ```
 
 ---
 
-### 调试
+### Debug
 
 ```python
-robot.debug = True  # 打印发送/接收的原始 JSON
+robot.debug = True  # Print sent/received raw JSON
 ```
 
 <div style="page-break-after: always;"></div>
 
-## 运动 API 参考
+## Motion API Reference
 
-### 运动目标类型
+### Motion Target Types
 
 #### JointPoint
 
 ```python
 @dataclass
 class JointPoint:
-    jp: List[float]  # 6 个关节角（度）
+    jp: List[float]  # 6 joint angles (degrees)
 ```
 
-关节目标。业务层用于声明「这是六轴关节角」，避免与 TCP 位姿混淆。
+Joint target. Used at the business layer to declare "this is a 6-axis joint angle", avoiding confusion with TCP pose.
 
-##### 工厂方法
+##### Factory Method
 
 ```python
 JointPoint.Degrees(joints_deg: Sequence[float]) -> JointPoint
 ```
 
-由六轴关节角（度）构造。
+Construct from six joint angles (degrees).
 
 ```python
 jp = JointPoint.Degrees([0, 0, 90, 0, 90, 0])
@@ -1354,19 +1354,19 @@ jp = JointPoint.Degrees([0, 0, 90, 0, 90, 0])
 ```python
 @dataclass
 class CartesianPoint:
-    cp: List[float]                    # TCP 位姿 [x,y,z,rx,ry,rz]（mm + 度）
-    rj: Optional[List[float]] = None   # 逆解参考关节角（度）
+    cp: List[float]                    # TCP pose [x,y,z,rx,ry,rz] (mm + degrees)
+    rj: Optional[List[float]] = None   # IK reference joint angles (degrees)
 ```
 
-笛卡尔目标。`cp` 必填；`rj` 可选（打包时缺省为控制器默认参考关节）。
+Cartesian target. `cp` is required; `rj` is optional (defaults to controller default reference joints when packing).
 
-##### 工厂方法
+##### Factory Methods
 
 ```python
 CartesianPoint.MmDeg(pose_mm_deg: Sequence[float]) -> CartesianPoint
 ```
 
-TCP 位姿 `[x,y,z,rx,ry,rz]`（mm + 度），无参考关节。
+TCP pose `[x,y,z,rx,ry,rz]` (mm + degrees), no reference joints.
 
 ```python
 CartesianPoint.MmDegWithRef(
@@ -1375,7 +1375,7 @@ CartesianPoint.MmDegWithRef(
 ) -> CartesianPoint
 ```
 
-TCP 位姿 + 逆解参考关节（度）。当 movJ/movL 到 TCP 且在意姿态解时推荐使用。
+TCP pose + IK reference joints (degrees). Recommended when using movJ/movL to TCP and caring about orientation solution.
 
 ```python
 cp = CartesianPoint.MmDeg([400, 200, 500, 180, 0, 90])
@@ -1398,9 +1398,9 @@ class MovePoint:
     ep: Optional[Sequence[float]] = None
 ```
 
-通用运动点位定义。通常不直接使用，而是通过 `JointPoint` / `CartesianPoint` 构造。
+General motion point definition. Usually not used directly; constructed via `JointPoint` / `CartesianPoint`.
 
-##### 工厂方法
+##### Factory Methods
 
 ```python
 MovePoint.FromJoint(joint: JointPoint) -> MovePoint
@@ -1409,7 +1409,7 @@ MovePoint.FromCartesian(cart: CartesianPoint) -> MovePoint
 
 ---
 
-### 运动指令
+### Motion Instructions
 
 #### MoveInstruction
 
@@ -1428,9 +1428,9 @@ class MoveInstruction:
     tool: Optional[Sequence[float]] = None
 ```
 
-单段 `Robot/move` 指令。请用类方法构建，勿手写 `type` + 裸 `MovePoint`。
+Single-segment `Robot/move` instruction. Use class methods to construct; do not manually write `type` + bare `MovePoint`.
 
-##### 工厂方法
+##### Factory Methods
 
 ###### MoveInstruction.MovJ
 
@@ -1446,7 +1446,7 @@ MoveInstruction.MovJ(
 ) -> MoveInstruction
 ```
 
-关节运动 movJ。目标可为关节或 TCP。
+Joint motion movJ. Target can be joint or TCP.
 
 ###### MoveInstruction.MovL
 
@@ -1462,7 +1462,7 @@ MoveInstruction.MovL(
 ) -> MoveInstruction
 ```
 
-直线运动 movL。目标可为 TCP 或关节。
+Linear motion movL. Target can be TCP or joint.
 
 ###### MoveInstruction.MovC
 
@@ -1479,7 +1479,7 @@ MoveInstruction.MovC(
 ) -> MoveInstruction
 ```
 
-圆弧运动 movC。中间点与目标均为 TCP。
+Circular arc motion movC. Both middle and target are TCP.
 
 ###### MoveInstruction.MovCircle
 
@@ -1497,7 +1497,7 @@ MoveInstruction.MovCircle(
 ) -> MoveInstruction
 ```
 
-整圆运动 movCircle。
+Full circle motion movCircle.
 
 ---
 
@@ -1513,7 +1513,7 @@ class MotionType(str, Enum):
 
 ---
 
-### MoveTo 目标
+### MoveTo Targets
 
 #### MoveToTarget
 
@@ -1525,9 +1525,9 @@ class MoveToTarget:
     ep: Sequence[float] = field(default_factory=list)
 ```
 
-MoveTo 专用目标结构。
+MoveTo-specific target structure.
 
-##### 工厂方法
+##### Factory Methods
 
 ```python
 MoveToTarget.Joint(joint: JointPoint) -> MoveToTarget
@@ -1538,39 +1538,39 @@ MoveToTarget.Cartesian(cart: CartesianPoint) -> MoveToTarget
 
 ```python
 class MoveToType(IntEnum):
-    STOP = -1      # 停止 MoveTo
-    HOME = 0       # Home 点
-    SAFE = 1       # 安全位
-    CANDLE = 2     # 蜡烛位
-    PACK = 3       # 打包位
-    JOINT = 4      # 关节规划
-    LINEAR = 5     # 直线规划
-    RESUME = 6     # 程序恢复点
+    STOP = -1      # Stop MoveTo
+    HOME = 0       # Home position
+    SAFE = 1       # Safe position
+    CANDLE = 2     # Candle position
+    PACK = 3       # Pack position
+    JOINT = 4      # Joint planned
+    LINEAR = 5     # Linear planned
+    RESUME = 6     # Program resume point
 ```
 
 ---
 
-### 点动参数
+### Jog Parameters
 
 #### JogMode
 
 ```python
 class JogMode(IntEnum):
-    JOINT = 1    # 关节点动
-    LINEAR = 2   # 直线点动
+    JOINT = 1    # Joint jog
+    LINEAR = 2   # Linear jog
 ```
 
 #### JogCoorType
 
 ```python
 class JogCoorType(IntEnum):
-    USER = 0     # 用户坐标系
-    TOOL = 1     # 工具坐标系
+    USER = 0     # User coordinate
+    TOOL = 1     # Tool coordinate
 ```
 
 ---
 
-### MotionPath（过渡 API）
+### MotionPath (Legacy API)
 
 ```python
 class MotionPath:
@@ -1582,11 +1582,11 @@ class MotionPath:
     def get_commands(self) -> List[Dict[str, Any]]
 ```
 
-运动路径构建器。新代码优先使用 `List[MoveInstruction]` + `Move()`。
+Motion path builder. New code should prefer `List[MoveInstruction]` + `Move()`.
 
 ---
 
-### 完整多段路径示例
+### Complete Multi-Segment Path Example
 
 ```python
 from codroid import (
@@ -1603,7 +1603,7 @@ InitConsoleUtf8()
 with CodroidClient(host="192.168.8.136") as robot:
     robot.ConnectRemoteAndSwitchOn()
 
-    # 四组合路径
+    # Four-combination path
     path = [
         MoveInstruction.MovJ(JointPoint.Degrees([0, 0, 90, 0, 90, 0]),
                              speed=40, acc=100),
@@ -1616,7 +1616,7 @@ with CodroidClient(host="192.168.8.136") as robot:
     ]
     robot.Move(path)
 
-    # 阻塞式路径执行
+    # Blocking path execution
     robot.StartListenUdp()
     robot.WaitForCriData()
     robot.MoveSync(path, wait=MotionWaitOptions(timeout=120.0))
@@ -1624,27 +1624,26 @@ with CodroidClient(host="192.168.8.136") as robot:
 
 ---
 
-### 运动参数说明
+### Motion Parameter Notes
 
 #### speed / acceleration
 
-- `speed`：速度值，具体单位取决于运动类型和控制器配置。
-- `acceleration`：加速度值。
+- `speed`: Speed value. Exact unit depends on motion type and controller configuration.
+- `acceleration`: Acceleration value.
 
-#### blend / relative_blend
+#### blend
 
-- `blend`：平滑半径。与 `relative_blend` 互斥——同时传入时 `relative_blend` 无效。不传表示无过渡。
-- `relative_blend`：相对平滑比（0–1）。与 `blend` 互斥——同时传入时此参数无效。
+Blend radius. Default `0.0` (exact arrival at target). When set to a value > 0, the robot smoothly transitions near the target without stopping.
 
 #### coor / tool
 
-可选的用户坐标系和工具坐标系，格式为 `[x, y, z, a, b, c]`（mm + 度）。None 时指令中不包含该字段。
+Optional user coordinate and tool coordinate, format `[x, y, z, a, b, c]` (mm + degrees).
 
 <div style="page-break-after: always;"></div>
 
-## 数据类型与枚举
+## Data Types & Enums
 
-### 通讯模型
+### Communication Models
 
 #### CommonResponse
 
@@ -1661,16 +1660,16 @@ class CommonResponse:
         return self.err is None
 ```
 
-TCP JSON 通用响应。所有 TCP 指令返回此类型。
+TCP JSON common response. All TCP commands return this type.
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `id` | `int / str` | 请求 ID |
-| `ty` | `str` | 响应类型 |
-| `db` | `Any` | 响应数据 |
-| `err` | `Any` | 错误信息（`None` 表示成功） |
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `int / str` | Request ID |
+| `ty` | `str` | Response type |
+| `db` | `Any` | Response data |
+| `err` | `Any` | Error info (`None` means success) |
 
-历史别名：`CodroidResponse = CommonResponse`
+Legacy alias: `CodroidResponse = CommonResponse`
 
 ---
 
@@ -1684,11 +1683,11 @@ class CodroidRequest:
     db: Optional[Any] = None
 ```
 
-SDK 通用请求结构。内部使用。
+SDK internal request structure.
 
 ---
 
-### CRI 实时数据
+### CRI Real-time Data
 
 #### CriRealTimeData
 
@@ -1707,22 +1706,22 @@ class CriRealTimeData:
     extra_axis_pos: List[float] = field(default_factory=list)
 ```
 
-CRI 解析后实时数据。所有值已转换为 mm + 度。
+CRI parsed real-time data. All values converted to mm + degrees.
 
-| 字段 | 属性别名 | 类型 | 单位 | 说明 |
-|------|----------|------|------|------|
-| `timestamp` | `timestamp_ms` | `int` | ms | 时间戳 |
-| `status` | — | `CriStatus` | — | 状态位 |
-| `joint_pos` | `joint_position` | `List[float]` | deg | 6 轴关节角 |
-| `joint_vel` | `joint_velocity` | `List[float]` | deg/s | 6 轴关节速度 |
-| `cartesian_pos` | `tcp_pose` | `List[float]` | mm, deg | TCP 位姿 [x,y,z,rx,ry,rz] |
-| `cartesian_vel` | `tcp_velocity` | `List[float]` | mm/s, deg/s | TCP 速度 |
-| `tcp_speed` | `tcp_linear_velocity` | `float` | mm/s | TCP 线速度 |
-| `joint_torque` | `joint_output_torque` | `List[float]` | Nm | 关节输出力矩 |
-| `external_torque` | `joint_external_force` | `List[float]` | Nm | 外部力矩 |
-| `extra_axis_pos` | `external_axis_position` | `List[float]` | — | 外部轴位置 |
+| Field | Property Alias | Type | Unit | Description |
+|-------|---------------|------|------|-------------|
+| `timestamp` | `timestamp_ms` | `int` | ms | Timestamp |
+| `status` | — | `CriStatus` | — | Status bits |
+| `joint_pos` | `joint_position` | `List[float]` | deg | 6 joint angles |
+| `joint_vel` | `joint_velocity` | `List[float]` | deg/s | 6 joint velocities |
+| `cartesian_pos` | `tcp_pose` | `List[float]` | mm, deg | TCP pose [x,y,z,rx,ry,rz] |
+| `cartesian_vel` | `tcp_velocity` | `List[float]` | mm/s, deg/s | TCP velocity |
+| `tcp_speed` | `tcp_linear_velocity` | `float` | mm/s | TCP linear speed |
+| `joint_torque` | `joint_output_torque` | `List[float]` | Nm | Joint output torque |
+| `external_torque` | `joint_external_force` | `List[float]` | Nm | External torque |
+| `extra_axis_pos` | `external_axis_position` | `List[float]` | — | External axis position |
 
-历史别名：`CRIData = CriRealTimeData`
+Legacy alias: `CRIData = CriRealTimeData`
 
 ---
 
@@ -1753,34 +1752,34 @@ class CriStatus:
     error_code: int = 0
 ```
 
-CRI 状态位解析。
+CRI status bit parsing.
 
-| 字段 | 说明 |
-|------|------|
-| `project_running` | 工程运行中 |
-| `project_stopped` | 工程已停止 |
-| `project_paused` | 工程已暂停 |
-| `is_enabling` | 已使能 |
-| `is_disabled` | 未使能 |
-| `is_manual` | 手动模式 |
-| `is_dragging` | 拖拽模式 |
-| `is_moving` | 运动中 |
-| `collision_stop` | 碰撞停止 |
-| `is_at_safe_pos` | 在安全位置 |
-| `has_alarm` | 有报警 |
-| `is_simulation` | 仿真模式 |
-| `is_emergency_stop` | 急停按下 |
-| `is_rescue` | 救援模式 |
-| `is_auto` | 自动模式 |
-| `is_remote` | 远程模式 |
-| `rt_control_mode` | 实时控制模式 |
-| `error_code` | 错误码（高 8 位） |
+| Field | Description |
+|-------|-------------|
+| `project_running` | Project running |
+| `project_stopped` | Project stopped |
+| `project_paused` | Project paused |
+| `is_enabling` | Enabled |
+| `is_disabled` | Disabled |
+| `is_manual` | Manual mode |
+| `is_dragging` | Drag mode |
+| `is_moving` | Moving |
+| `collision_stop` | Collision stopped |
+| `is_at_safe_pos` | At safe position |
+| `has_alarm` | Has alarm |
+| `is_simulation` | Simulation mode |
+| `is_emergency_stop` | Emergency stop pressed |
+| `is_rescue` | Rescue mode |
+| `is_auto` | Auto mode |
+| `is_remote` | Remote mode |
+| `rt_control_mode` | Real-time control mode |
+| `error_code` | Error code (high 8 bits) |
 
-历史别名：`CRIStatus = CriStatus`
+Legacy alias: `CRIStatus = CriStatus`
 
 ---
 
-### 机器人设置
+### Robot Settings
 
 #### RobotFrame
 
@@ -1796,13 +1795,13 @@ class RobotFrame:
     c: float = 0.0
 ```
 
-工具 / 用户坐标系单帧。
+Tool / user coordinate single frame.
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `id` | `int` | 槽位 ID（0~15，0 为保留项） |
-| `x, y, z` | `float` | 位置（mm） |
-| `a, b, c` | `float` | 姿态（度） |
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `int` | Slot ID (0~15, 0 is reserved) |
+| `x, y, z` | `float` | Position (mm) |
+| `a, b, c` | `float` | Orientation (degrees) |
 
 ```python
 frame = RobotFrame(id=1, x=100, y=0, z=50, a=0, b=0, c=0)
@@ -1822,13 +1821,13 @@ class RobotPayloadFrame:
     mz: float = 0.0
 ```
 
-负载坐标系单帧。
+Payload coordinate single frame.
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `id` | `int` | 槽位 ID（0~15，0 为保留项） |
-| `m` | `float` | 质量（kg） |
-| `mx, my, mz` | `float` | 质心位置（mm） |
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `int` | Slot ID (0~15, 0 is reserved) |
+| `m` | `float` | Mass (kg) |
+| `mx, my, mz` | `float` | Center of mass (mm) |
 
 ```python
 payload = RobotPayloadFrame(id=1, m=2.5, mx=0, my=0, mz=50)
@@ -1850,21 +1849,21 @@ class RobotParameters:
     coordinate: List[RobotFrame] = field(default_factory=list)
 ```
 
-`GetRobotParameters()` 返回的设置界面参数快照。
+Settings interface parameter snapshot returned by `GetRobotParameters()`.
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `default_tool_id` | `int` | 默认工具坐标系编号 |
-| `default_payload_id` | `int` | 默认负载编号 |
-| `default_coordinate_id` | `int` | 默认用户坐标系编号 |
-| `max_payload` | `float` | 最大负载（kg） |
-| `tool` | `List[RobotFrame]` | 工具坐标系表（16 项） |
-| `payload` | `List[RobotPayloadFrame]` | 负载坐标系表（16 项） |
-| `coordinate` | `List[RobotFrame]` | 用户坐标系表（16 项） |
+| Field | Type | Description |
+|-------|------|-------------|
+| `default_tool_id` | `int` | Default tool frame ID |
+| `default_payload_id` | `int` | Default payload ID |
+| `default_coordinate_id` | `int` | Default user coordinate ID |
+| `max_payload` | `float` | Max payload (kg) |
+| `tool` | `List[RobotFrame]` | Tool frame table (16 items) |
+| `payload` | `List[RobotPayloadFrame]` | Payload frame table (16 items) |
+| `coordinate` | `List[RobotFrame]` | User coordinate frame table (16 items) |
 
 ---
 
-### 全局变量
+### Global Variables
 
 #### GlobalVariable
 
@@ -1875,21 +1874,21 @@ class GlobalVariable:
     note: Optional[str] = None
 ```
 
-全局变量数据模型。
+Global variable data model.
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `value` | `Any` | 变量值（支持 int, float, str, list, dict） |
-| `note` | `str` | 变量备注 |
+| Field | Type | Description |
+|-------|------|-------------|
+| `value` | `Any` | Variable value (supports int, float, str, list, dict) |
+| `note` | `str` | Variable note |
 
 ```python
-var = GlobalVariable(value=42, note="计数器")
+var = GlobalVariable(value=42, note="counter")
 robot.SaveGlobalVar("counter", var)
 ```
 
 ---
 
-### 枚举类型
+### Enum Types
 
 #### CoordinateType
 
@@ -1899,16 +1898,16 @@ class CoordinateType(str, Enum):
     TOOL = "tool"
 ```
 
-坐标系类型。
+Coordinate system type.
 
 #### IOType
 
 ```python
 class IOType(str, Enum):
-    DI = "DI"   # 数字输入
-    DO = "DO"   # 数字输出
-    AI = "AI"   # 模拟输入
-    AO = "AO"   # 模拟输出
+    DI = "DI"   # Digital Input
+    DO = "DO"   # Digital Output
+    AI = "AI"   # Analog Input
+    AO = "AO"   # Analog Output
 ```
 
 #### ExtendArrayType
@@ -1925,7 +1924,7 @@ class ExtendArrayType(str, Enum):
     FLOAT32 = "Float32"
 ```
 
-扩展数组数据类型。
+Extended array data type.
 
 #### RS485BaudRate
 
@@ -1982,9 +1981,9 @@ class CriMask(IntFlag):
     EXTRA_AXIS_POS = 1 << 15
 ```
 
-CRI 推送位掩码。
+CRI push bitmask.
 
-历史别名：`CRIMask = CriMask`
+Legacy alias: `CRIMask = CriMask`
 
 #### CriFilterType
 
@@ -1996,13 +1995,13 @@ class CriFilterType(IntEnum):
     ELLIPTIC = 3
 ```
 
-CRI 实时控制滤波类型。
+CRI real-time control filter type.
 
-历史别名：`CRIFilterType = CriFilterType`
+Legacy alias: `CRIFilterType = CriFilterType`
 
 ---
 
-### 异常
+### Exceptions
 
 #### CodroidError
 
@@ -2011,7 +2010,7 @@ class CodroidError(Exception):
     pass
 ```
 
-基础异常类。参数校验失败、非法操作等。
+Base exception. Parameter validation failure, illegal operations, etc.
 
 #### CodroidCommandException
 
@@ -2020,7 +2019,7 @@ class CodroidCommandException(CodroidError):
     pass
 ```
 
-控制器返回 `err` 字段。
+Controller returned `err` field.
 
 #### CodroidNetworkError
 
@@ -2029,7 +2028,7 @@ class CodroidNetworkError(CodroidError):
     pass
 ```
 
-TCP 连接或通信失败。
+TCP connection or communication failure.
 
 #### CodroidTimeoutError
 
@@ -2038,11 +2037,11 @@ class CodroidTimeoutError(CodroidError):
     pass
 ```
 
-操作超时。
+Operation timeout.
 
 <div style="page-break-after: always;"></div>
 
-## CRI 实时数据与控制 API 参考
+## CRI Real-time Data & Control API Reference
 
 ### CriRealtimePacketParser
 
@@ -2052,22 +2051,22 @@ class CriRealtimePacketParser:
     def parse(data: bytes) -> Optional[CriRealTimeData]
 ```
 
-解析 308 字节 CRI UDP 包为 `CriRealTimeData`（mm + 度）。非 308 字节的包返回 `None`。
+Parse 308-byte CRI UDP packets into `CriRealTimeData` (mm + degrees). Returns `None` for non-308-byte packets.
 
-自动完成线路层单位转换：
-- 关节角：rad → deg
-- TCP 位置：m → mm
-- TCP 姿态：rad → deg
-- 速度：m/s → mm/s, rad/s → deg/s
+Automatic wire-layer unit conversion:
+- Joint angles: rad → deg
+- TCP position: m → mm
+- TCP orientation: rad → deg
+- Velocity: m/s → mm/s, rad/s → deg/s
 
 ```python
 from codroid import CriRealtimePacketParser
 
 data = CriRealtimePacketParser.parse(raw_bytes)
 if data is not None:
-    print(f"关节角: {data.joint_position}")
-    print(f"TCP 位姿: {data.tcp_pose}")
-    print(f"运动中: {data.status.is_moving}")
+    print(f"Joint angles: {data.joint_position}")
+    print(f"TCP pose: {data.tcp_pose}")
+    print(f"Is moving: {data.status.is_moving}")
 ```
 
 ---
@@ -2085,14 +2084,14 @@ class CriStreamHandler:
     )
 ```
 
-可变 mask / 精度的 CRI UDP 包解析。支持灵活的位掩码和精度配置。
+Variable mask/precision CRI UDP packet parser. Supports flexible bitmask and precision configuration.
 
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `high_precision` | `bool` | `True` | 双精度（Float64）/ 单精度（Float32） |
-| `mask` | `int` | `0xFFFF` | 位掩码，控制解析哪些字段 |
-| `joint_count` | `int` | `6` | 关节数 |
-| `extra_axis_count` | `int` | `0` | 外部轴数 |
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `high_precision` | `bool` | `True` | Double (Float64) / Single (Float32) precision |
+| `mask` | `int` | `0xFFFF` | Bitmask controlling which fields to parse |
+| `joint_count` | `int` | `6` | Number of joints |
+| `extra_axis_count` | `int` | `0` | Number of extra axes |
 
 #### bind
 
@@ -2100,7 +2099,7 @@ class CriStreamHandler:
 def bind(self, port: int) -> None
 ```
 
-绑定 UDP 端口。
+Bind UDP port.
 
 #### parse_packet
 
@@ -2108,7 +2107,7 @@ def bind(self, port: int) -> None
 def parse_packet(self, data: bytes) -> CriRealTimeData
 ```
 
-解析单个 CRI 数据包。
+Parse a single CRI data packet.
 
 ```python
 from codroid import CriStreamHandler
@@ -2120,7 +2119,7 @@ try:
     while True:
         data, addr = handler._sock.recvfrom(2048)
         parsed = handler.parse_packet(data)
-        print(f"关节角: {parsed.joint_position}")
+        print(f"Joint angles: {parsed.joint_position}")
 finally:
     handler._sock.close()
 ```
@@ -2139,15 +2138,15 @@ class CriRealtimeDispatcher:
     )
 ```
 
-UDP 实时命令下发器。发送 64 字节控制指令到控制器。
+UDP real-time command dispatcher. Sends 64-byte control commands to the controller.
 
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `controller_ip` | `str` | — | 控制器 IP |
-| `controller_udp_port` | `int` | `9030` | 控制器 UDP 端口 |
-| `convert_to_si` | `bool` | `True` | 自动将 mm/deg 转换为 m/rad |
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `controller_ip` | `str` | — | Controller IP |
+| `controller_udp_port` | `int` | `9030` | Controller UDP port |
+| `convert_to_si` | `bool` | `True` | Auto-convert mm/deg to m/rad |
 
-支持 `with` 语句。
+Supports `with` statement.
 
 #### SendCommand
 
@@ -2155,12 +2154,12 @@ UDP 实时命令下发器。发送 64 字节控制指令到控制器。
 def SendCommand(self, position6: Sequence[float], space: TrajectorySpace) -> None
 ```
 
-发送单帧实时控制指令。
+Send a single real-time control frame.
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `position6` | `Sequence[float]` | 6 个位置值（mm+deg 或 deg） |
-| `space` | `TrajectorySpace` | `JOINT` 或 `CARTESIAN` |
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `position6` | `Sequence[float]` | 6 position values (mm+deg or deg) |
+| `space` | `TrajectorySpace` | `JOINT` or `CARTESIAN` |
 
 #### SendTrajectory
 
@@ -2173,7 +2172,7 @@ def SendTrajectory(
 ) -> None
 ```
 
-发送完整轨迹。按 `period_ms` 间隔逐帧发送。
+Send a complete trajectory. Sends frame by frame at `period_ms` intervals.
 
 ```python
 from codroid import CriRealtimeDispatcher, TrajectorySpace
@@ -2202,15 +2201,15 @@ class TrajectoryGenerator:
     ) -> List[TrajectoryPoint]
 ```
 
-离线轨迹生成。
+Offline trajectory generation.
 
 #### generate
 
-单段轨迹生成。`start` 和 `target` 均为 6 元素数组。
+Single-segment trajectory generation. Both `start` and `target` are 6-element arrays.
 
 #### generate_multi_segment
 
-多段轨迹生成。`waypoints` 至少包含 2 个路径点。
+Multi-segment trajectory generation. `waypoints` must contain at least 2 waypoints.
 
 ```python
 from codroid import (
@@ -2253,18 +2252,18 @@ class TrajectoryRequest:
     duration_seconds: Optional[float] = None
 ```
 
-轨迹生成请求参数。
+Trajectory generation request parameters.
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `space` | `TrajectorySpace` | `JOINT`（关节空间）或 `CARTESIAN`（笛卡尔空间） |
-| `frequency_hz` | `float` | 采样频率（Hz） |
-| `profile` | `TrajectoryProfile` | `CUBIC`（三次多项式）或 `TRAPEZOIDAL`（梯形） |
-| `acceleration` | `float` | 加速度 |
-| `speed` | `float` | 速度（与 `duration_seconds` 二选一） |
-| `duration_seconds` | `float` | 总时长（与 `speed` 二选一） |
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `space` | `TrajectorySpace` | `JOINT` (joint space) or `CARTESIAN` (Cartesian space) |
+| `frequency_hz` | `float` | Sampling frequency (Hz) |
+| `profile` | `TrajectoryProfile` | `CUBIC` (cubic polynomial) or `TRAPEZOIDAL` |
+| `acceleration` | `float` | Acceleration |
+| `speed` | `float` | Speed (mutually exclusive with `duration_seconds`) |
+| `duration_seconds` | `float` | Total duration (mutually exclusive with `speed`) |
 
-> **注意**：`speed` 和 `duration_seconds` 必须且只能设置其中一个。
+> **Note**: Exactly one of `speed` and `duration_seconds` must be set.
 
 ---
 
@@ -2293,13 +2292,13 @@ class TrajectoryProfile(Enum):
 ```python
 @dataclass
 class TrajectoryPoint:
-    t: float           # 时间（秒）
-    position: List[float]  # 6 个位置值
+    t: float              # Time (seconds)
+    position: List[float] # 6 position values
 ```
 
 ---
 
-### 完整 CRI 控制流程示例
+### Complete CRI Control Flow Example
 
 ```python
 from codroid import (
@@ -2319,10 +2318,10 @@ ROBOT_IP = "192.168.8.136"
 with CodroidClient(host=ROBOT_IP) as robot:
     robot.ConnectRemoteAndSwitchOn()
 
-    # 1. 开启 CRI 实时控制
+    # 1. Start CRI real-time control
     robot.StartCriControl()
 
-    # 2. 生成轨迹
+    # 2. Generate trajectory
     request = TrajectoryRequest(
         space=TrajectorySpace.JOINT,
         frequency_hz=250,
@@ -2336,41 +2335,42 @@ with CodroidClient(host=ROBOT_IP) as robot:
         request,
     )
 
-    # 3. 下发轨迹
+    # 3. Send trajectory
     with CriRealtimeDispatcher(ROBOT_IP) as dispatcher:
         dispatcher.SendTrajectory(trajectory, TrajectorySpace.JOINT, period_ms=4)
 
-    # 4. 关闭实时控制
+    # 4. Stop real-time control
     robot.StopCriControl()
 ```
 
-### 工作流程图
+### Workflow Diagram
 
 ```
 ┌─────────────┐     TCP JSON      ┌──────────────┐
-│  Python SDK  │ ──────────────── │  控制器       │
+│  Python SDK  │ ──────────────── │  Controller   │
 │              │  CRI/StartControl │              │
 │              │ ──────────────── │              │
 │              │                   │              │
 │  CriRealtime │     UDP 64B       │              │
-│  Dispatcher  │ ──────────────── │  实时控制接收 │
-│              │  每 4ms 一帧      │              │
+│  Dispatcher  │ ──────────────── │  RT Control   │
+│              │  every 4ms        │  Receiver     │
 └─────────────┘                   └──────────────┘
        ▲
-       │ UDP 308B（100ms 周期）
+       │ UDP 308B (100ms period)
        │
 ┌─────────────┐
-│  CRI 数据推送 │
+│  CRI Data    │
+│  Push        │
 └─────────────┘
 ```
 
 <div style="page-break-after: always;"></div>
 
-## IO 与寄存器 API 参考
+## IO & Registers API Reference
 
-### IO 操作
+### IO Operations
 
-#### 数字 IO
+#### Digital IO
 
 ##### GetDi
 
@@ -2378,7 +2378,7 @@ with CodroidClient(host=ROBOT_IP) as robot:
 def GetDi(self, port: int) -> int
 ```
 
-获取数字输入（DI）值。端口 0~15，返回 0 或 1。
+Get Digital Input (DI) value. Port 0~15, returns 0 or 1.
 
 ##### GetDo
 
@@ -2386,7 +2386,7 @@ def GetDi(self, port: int) -> int
 def GetDo(self, port: int) -> int
 ```
 
-获取数字输出（DO）值。端口 0~15，返回 0 或 1。
+Get Digital Output (DO) value. Port 0~15, returns 0 or 1.
 
 ##### SetDo
 
@@ -2394,17 +2394,17 @@ def GetDo(self, port: int) -> int
 def SetDo(self, port: int, value: int) -> CommonResponse
 ```
 
-设置数字输出（DO）值。端口 0~15，值为 0 或 1。
+Set Digital Output (DO) value. Port 0~15, value 0 or 1.
 
 ```python
-di0 = robot.GetDi(0)        # 读取 DI 端口 0
-robot.SetDo(10, 1)          # 设置 DO 端口 10 为 1
-robot.SetDo(10, di0)        # 将 DI 值写入 DO
+di0 = robot.GetDi(0)        # Read DI port 0
+robot.SetDo(10, 1)          # Set DO port 10 to 1
+robot.SetDo(10, di0)        # Write DI value to DO
 ```
 
 ---
 
-#### 模拟 IO
+#### Analog IO
 
 ##### GetAi
 
@@ -2412,7 +2412,7 @@ robot.SetDo(10, di0)        # 将 DI 值写入 DO
 def GetAi(self, port: int) -> float
 ```
 
-获取模拟输入（AI）值。端口 0~3。
+Get Analog Input (AI) value. Port 0~3.
 
 ##### GetAo
 
@@ -2420,7 +2420,7 @@ def GetAi(self, port: int) -> float
 def GetAo(self, port: int) -> float
 ```
 
-获取模拟输出（AO）值。端口 0~3。
+Get Analog Output (AO) value. Port 0~3.
 
 ##### SetAo
 
@@ -2428,16 +2428,16 @@ def GetAo(self, port: int) -> float
 def SetAo(self, port: int, value: float) -> CommonResponse
 ```
 
-设置模拟输出（AO）值。端口 0~3。
+Set Analog Output (AO) value. Port 0~3.
 
 ```python
-ai0 = robot.GetAi(0)        # 读取 AI 端口 0
-robot.SetAo(0, 3.14)        # 设置 AO 端口 0
+ai0 = robot.GetAi(0)        # Read AI port 0
+robot.SetAo(0, 3.14)        # Set AO port 0
 ```
 
 ---
 
-#### 批量 IO
+#### Batch IO
 
 ##### GetIoValues
 
@@ -2445,11 +2445,11 @@ robot.SetAo(0, 3.14)        # 设置 AO 端口 0
 def GetIoValues(self, io_requests: List[Dict[str, Any]]) -> CommonResponse
 ```
 
-批量读取多个 IO 值。
+Batch read multiple IO values.
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `io_requests` | `List[Dict]` | 包含 `type` 和 `port` 的列表 |
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `io_requests` | `List[Dict]` | List containing `type` and `port` |
 
 ```python
 response = robot.GetIoValues([
@@ -2467,7 +2467,7 @@ for item in response.db:
 def SetIoValues(self, io_list: List[Dict[str, Any]]) -> List[CommonResponse]
 ```
 
-批量设置 IO 值。内部通过循环调用 `SetDo` / `SetAo` 实现。
+Batch set IO values. Internally loops through `SetDo` / `SetAo`.
 
 ```python
 robot.SetIoValues([
@@ -2479,20 +2479,20 @@ robot.SetIoValues([
 
 ---
 
-#### IO 端口范围
+#### IO Port Ranges
 
-| 类型 | 端口范围 | 值类型 |
-|------|----------|--------|
-| DI（数字输入） | 0~15 | 0 或 1 |
-| DO（数字输出） | 0~15 | 0 或 1 |
-| AI（模拟输入） | 0~3 | float |
-| AO（模拟输出） | 0~3 | float |
+| Type | Port Range | Value Type |
+|------|-----------|------------|
+| DI (Digital Input) | 0~15 | 0 or 1 |
+| DO (Digital Output) | 0~15 | 0 or 1 |
+| AI (Analog Input) | 0~3 | float |
+| AO (Analog Output) | 0~3 | float |
 
-超出范围抛出 `CodroidError`。
+Out-of-range values throw `CodroidError`.
 
 ---
 
-### 寄存器操作
+### Register Operations
 
 #### GetRegisterValue
 
@@ -2500,7 +2500,7 @@ robot.SetIoValues([
 def GetRegisterValue(self, address: int) -> Any
 ```
 
-获取单个寄存器值。
+Get a single register value.
 
 #### GetRegisterValues
 
@@ -2508,7 +2508,7 @@ def GetRegisterValue(self, address: int) -> Any
 def GetRegisterValues(self, addresses: List[int]) -> CommonResponse
 ```
 
-批量获取多个寄存器值。
+Batch get multiple register values.
 
 ```python
 val = robot.GetRegisterValue(0)
@@ -2523,7 +2523,7 @@ for item in vals.db:
 def SetRegisterValue(self, address: int, value: Any) -> CommonResponse
 ```
 
-写入寄存器值。
+Write register value.
 
 ```python
 robot.SetRegisterValue(0, 42)
@@ -2532,7 +2532,7 @@ robot.SetRegisterValue(1, 3.14)
 
 ---
 
-#### 扩展数组
+#### Extended Arrays
 
 ##### SetExtendArrayType
 
@@ -2540,18 +2540,18 @@ robot.SetRegisterValue(1, 3.14)
 def SetExtendArrayType(self, index: int, data_type: ExtendArrayType) -> CommonResponse
 ```
 
-设置扩展数组数据类型。`index` 范围 0~999。
+Set extended array data type. `index` range 0~999.
 
-| 数据类型 | 说明 |
-|----------|------|
-| `ExtendArrayType.BOOL` | 布尔 |
-| `ExtendArrayType.UINT8` | 无符号 8 位整数 |
-| `ExtendArrayType.INT8` | 有符号 8 位整数 |
-| `ExtendArrayType.UINT16` | 无符号 16 位整数 |
-| `ExtendArrayType.INT16` | 有符号 16 位整数 |
-| `ExtendArrayType.UINT32` | 无符号 32 位整数 |
-| `ExtendArrayType.INT32` | 有符号 32 位整数 |
-| `ExtendArrayType.FLOAT32` | 32 位浮点数 |
+| Data Type | Description |
+|-----------|-------------|
+| `ExtendArrayType.BOOL` | Boolean |
+| `ExtendArrayType.UINT8` | Unsigned 8-bit integer |
+| `ExtendArrayType.INT8` | Signed 8-bit integer |
+| `ExtendArrayType.UINT16` | Unsigned 16-bit integer |
+| `ExtendArrayType.INT16` | Signed 16-bit integer |
+| `ExtendArrayType.UINT32` | Unsigned 32-bit integer |
+| `ExtendArrayType.INT32` | Signed 32-bit integer |
+| `ExtendArrayType.FLOAT32` | 32-bit float |
 
 ```python
 from codroid import ExtendArrayType
@@ -2565,11 +2565,11 @@ robot.SetExtendArrayType(0, ExtendArrayType.FLOAT32)
 def RemoveExtendArray(self, index: int) -> CommonResponse
 ```
 
-删除扩展数组索引（重置数据）。`index` 范围 0~999。
+Remove extended array index (reset data). `index` range 0~999.
 
 ---
 
-### 完整 IO + 寄存器示例
+### Complete IO + Register Example
 
 ```python
 from codroid import CodroidClient, ExtendArrayType, InitConsoleUtf8
@@ -2580,14 +2580,14 @@ with CodroidClient(host="192.168.8.136") as robot:
     robot.ConnectRemoteAndSwitchOn()
 
     # --- IO ---
-    # 读取单个 DI
+    # Read single DI
     di0 = robot.GetDi(0)
     print(f"DI 0 = {di0}")
 
-    # 写入单个 DO
+    # Write single DO
     robot.SetDo(10, 1)
 
-    # 批量读取
+    # Batch read
     io_data = robot.GetIoValues([
         {"type": "DI", "port": 0},
         {"type": "DI", "port": 1},
@@ -2596,29 +2596,29 @@ with CodroidClient(host="192.168.8.136") as robot:
     for item in io_data.db:
         print(f"  {item['type']}{item['port']} = {item['value']}")
 
-    # --- 寄存器 ---
-    # 读取单个
+    # --- Registers ---
+    # Read single
     val = robot.GetRegisterValue(0)
     print(f"R0 = {val}")
 
-    # 写入
+    # Write
     robot.SetRegisterValue(0, val + 1)
 
-    # 批量读取
+    # Batch read
     regs = robot.GetRegisterValues([0, 1, 2])
     for item in regs.db:
         print(f"  R{item['address']} = {item['value']}")
 
-    # 扩展数组
+    # Extended arrays
     robot.SetExtendArrayType(0, ExtendArrayType.FLOAT32)
     robot.RemoveExtendArray(0)
 ```
 
 <div style="page-break-after: always;"></div>
 
-## 辅助工具 API 参考
+## Utilities API Reference
 
-### 发布 / 订阅
+### Publish / Subscribe
 
 #### PublishTopics
 
@@ -2633,7 +2633,7 @@ class PublishTopics:
     ERROR = "publish/Error"
 ```
 
-控制器推送主题常量。
+Controller push topic constants.
 
 ---
 
@@ -2642,9 +2642,9 @@ class PublishTopics:
 ```python
 @dataclass
 class PublishNotification:
-    ty: str        # 主题类型
-    db: Any        # 推送数据
-    raw_json: str  # 原始 JSON 字符串
+    ty: str        # Topic type
+    db: Any        # Push data
+    raw_json: str  # Raw JSON string
 ```
 
 ---
@@ -2654,14 +2654,14 @@ class PublishNotification:
 ```python
 class PublishTopicSubscription:
     def dispose(self) -> None
-    def Dispose(self) -> None  # C# 别名
+    def Dispose(self) -> None  # C# alias
 ```
 
-订阅句柄。调用 `dispose()` 取消本地回调（不会向控制器发送取消订阅）。
+Subscription handle. Call `dispose()` to remove local callback (does not send unsubscribe to controller).
 
 ---
 
-#### SubscribePublishTopic（仅 CodroidClient）
+#### SubscribePublishTopic (CodroidClient only)
 
 ```python
 def SubscribePublishTopic(
@@ -2672,7 +2672,7 @@ def SubscribePublishTopic(
 ) -> PublishTopicSubscription
 ```
 
-订阅控制器推送主题。首次本地订阅时自动向控制器发送订阅请求。
+Subscribe to controller push topic. On first local subscription, automatically sends subscription request to controller.
 
 ```python
 from codroid import CodroidClient, PublishTopics, InitConsoleUtf8
@@ -2680,10 +2680,10 @@ from codroid import CodroidClient, PublishTopics, InitConsoleUtf8
 InitConsoleUtf8()
 
 def on_status(notification):
-    print(f"收到 {notification.ty}: {notification.db}")
+    print(f"Received {notification.ty}: {notification.db}")
 
 def on_error(notification):
-    print(f"错误: {notification.db}")
+    print(f"Error: {notification.db}")
 
 with CodroidClient(host="192.168.8.136") as robot:
     robot.ConnectRemoteAndSwitchOn()
@@ -2691,7 +2691,7 @@ with CodroidClient(host="192.168.8.136") as robot:
     sub1 = robot.SubscribePublishTopic(PublishTopics.ROBOT_STATUS, on_status)
     sub2 = robot.SubscribePublishTopic(PublishTopics.ERROR, on_error)
 
-    # ... 运行 ...
+    # ... run ...
 
     sub1.dispose()
     sub2.dispose()
@@ -2699,7 +2699,7 @@ with CodroidClient(host="192.168.8.136") as robot:
 
 ---
 
-### 全局变量
+### Global Variables
 
 #### GetGlobalVars
 
@@ -2707,7 +2707,7 @@ with CodroidClient(host="192.168.8.136") as robot:
 def GetGlobalVars(self) -> CommonResponse
 ```
 
-获取所有全局变量。
+Get all global variables.
 
 #### GetGlobalVarsCatalog
 
@@ -2715,7 +2715,7 @@ def GetGlobalVars(self) -> CommonResponse
 def GetGlobalVarsCatalog(self) -> CommonResponse
 ```
 
-获取全局变量目录（与 `GetGlobalVars` 相同 TCP 请求）。
+Get global variables catalog (same TCP request as `GetGlobalVars`).
 
 #### SaveGlobalVar
 
@@ -2723,7 +2723,7 @@ def GetGlobalVarsCatalog(self) -> CommonResponse
 def SaveGlobalVar(self, name: str, variable: GlobalVariable) -> CommonResponse
 ```
 
-保存单个全局变量。
+Save a single global variable.
 
 #### SaveGlobalVars
 
@@ -2731,7 +2731,7 @@ def SaveGlobalVar(self, name: str, variable: GlobalVariable) -> CommonResponse
 def SaveGlobalVars(self, variables: Dict[str, GlobalVariable]) -> CommonResponse
 ```
 
-批量保存全局变量。变量名会经过 Lua 保留字校验。
+Batch save global variables. Variable names are validated against Lua reserved words.
 
 #### RemoveGlobalVars
 
@@ -2739,7 +2739,7 @@ def SaveGlobalVars(self, variables: Dict[str, GlobalVariable]) -> CommonResponse
 def RemoveGlobalVars(self, names: List[str]) -> CommonResponse
 ```
 
-删除全局变量。
+Remove global variables.
 
 #### GetProjectVar
 
@@ -2747,35 +2747,35 @@ def RemoveGlobalVars(self, names: List[str]) -> CommonResponse
 def GetProjectVar(self) -> CommonResponse
 ```
 
-获取当前所有工程变量值（仅在工程运行中有效）。
+Get all current project variable values (only valid when project is running).
 
 ```python
 from codroid import GlobalVariable
 
-# 保存
-robot.SaveGlobalVar("counter", GlobalVariable(value=0, note="计数器"))
+# Save
+robot.SaveGlobalVar("counter", GlobalVariable(value=0, note="counter"))
 robot.SaveGlobalVar("name", GlobalVariable(value="test"))
 
-# 批量保存
+# Batch save
 robot.SaveGlobalVars({
     "x": GlobalVariable(value=100.0),
     "y": GlobalVariable(value=200.0),
 })
 
-# 读取
+# Read
 response = robot.GetGlobalVars()
 print(response.db)
 
-# 删除
+# Remove
 robot.RemoveGlobalVars(["counter", "name"])
 
-# 获取工程变量（工程运行中）
+# Get project variables (while project is running)
 proj_vars = robot.GetProjectVar()
 ```
 
 ---
 
-### 运动学
+### Kinematics
 
 #### AposToCpos
 
@@ -2789,18 +2789,18 @@ def AposToCpos(
 ) -> CommonResponse
 ```
 
-正解（关节 → 笛卡尔）。`jp` 为 6 个关节角（度）。
+Forward kinematics (joint → Cartesian). `jp` is 6 joint angles (degrees).
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `jp` | `Sequence[float]` | 6 个关节角（度） |
-| `coor` | `Optional[Sequence[float]]` | 用户坐标系 `[x,y,z,a,b,c]`。None 时指令中不包含该字段 |
-| `tool` | `Optional[Sequence[float]]` | 工具坐标系 `[x,y,z,a,b,c]`。None 时指令中不包含该字段 |
-| `ep` | `Sequence[float]` | 外部轴位置 |
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `jp` | `Sequence[float]` | 6 joint angles (degrees) |
+| `coor` | `Sequence[float]` | User coordinate `[x,y,z,a,b,c]` |
+| `tool` | `Sequence[float]` | Tool coordinate `[x,y,z,a,b,c]` |
+| `ep` | `Sequence[float]` | External axis positions |
 
 ```python
 response = robot.AposToCpos([0, 0, 90, 0, 90, 0])
-print(f"TCP 位姿: {response.db}")
+print(f"TCP pose: {response.db}")
 ```
 
 #### CposToApos
@@ -2814,11 +2814,11 @@ def CposToApos(
 ) -> CommonResponse
 ```
 
-逆解（笛卡尔 → 关节）。`cp` 为 `[x,y,z,a,b,c]`（mm + 度）。`rj` 为参考关节角（默认 `[20,20,20,20,20,20]`）。
+Inverse kinematics (Cartesian → joint). `cp` is `[x,y,z,a,b,c]` (mm + degrees). `rj` is reference joint angles (default `[20,20,20,20,20,20]`).
 
 ```python
 response = robot.CposToApos([400, 200, 500, 180, 0, 90])
-print(f"关节角: {response.db}")
+print(f"Joint angles: {response.db}")
 ```
 
 #### CalculateRelativePose
@@ -2834,15 +2834,15 @@ def CalculateRelativePose(
 ) -> CommonResponse
 ```
 
-笛卡尔坐标偏移计算。
+Cartesian coordinate offset calculation.
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `pos` | `Sequence[float]` | 当前 TCP 位姿 |
-| `offset` | `Sequence[float]` | 偏移量 |
-| `coor_type` | `CoordinateType` | `USER` 或 `TOOL` |
-| `pos_coor` | `Sequence[float]` | 当前 TCP 坐标系 |
-| `coor` | `Sequence[float]` | 偏移坐标系 |
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `pos` | `Sequence[float]` | Current TCP pose |
+| `offset` | `Sequence[float]` | Offset values |
+| `coor_type` | `CoordinateType` | `USER` or `TOOL` |
+| `pos_coor` | `Sequence[float]` | Current TCP coordinate |
+| `coor` | `Sequence[float]` | Offset coordinate |
 
 ```python
 from codroid import CoordinateType
@@ -2852,7 +2852,7 @@ response = robot.CalculateRelativePose(
     offset=[0, 0, -100, 0, 0, 0],
     coor_type=CoordinateType.TOOL,
 )
-print(f"偏移后位姿: {response.db}")
+print(f"Offset pose: {response.db}")
 ```
 
 ---
@@ -2865,7 +2865,7 @@ print(f"偏移后位姿: {response.db}")
 def InitConsoleUtf8() -> None
 ```
 
-Windows 控制台 UTF-8 初始化。在 `cmd`（非 Windows Terminal）下运行含中文的示例时，须在入口调用。Linux / macOS 上为 no-op。
+Windows console UTF-8 initialization. Must be called at entry when running examples with Chinese characters in `cmd` (not Windows Terminal). No-op on Linux / macOS.
 
 ```python
 from codroid import InitConsoleUtf8
@@ -2873,7 +2873,7 @@ from codroid import InitConsoleUtf8
 InitConsoleUtf8()
 ```
 
-历史别名：`init_console_utf8 = InitConsoleUtf8`
+Legacy alias: `init_console_utf8 = InitConsoleUtf8`
 
 ---
 
@@ -2882,14 +2882,14 @@ InitConsoleUtf8()
 ```python
 from codroid import PrintBanner
 
-PrintBanner("标题", "副标题")
+PrintBanner("Title", "Subtitle")
 ```
 
-在终端打印彩色横幅标题。需要安装 `colorama`：`pip install "codroid-robot-sdk[color]"`。
+Print a colored banner title in the terminal. Requires `colorama`: `pip install "codroid-robot-sdk[color]"`.
 
 ---
 
-### 完整辅助工具示例
+### Complete Utilities Example
 
 ```python
 from codroid import (
@@ -2902,7 +2902,7 @@ from codroid import (
 )
 
 InitConsoleUtf8()
-PrintBanner("辅助工具示例", "Publish / 全局变量 / 运动学")
+PrintBanner("Utilities Example", "Publish / Global Vars / Kinematics")
 
 ROBOT_IP = "192.168.8.136"
 
@@ -2915,25 +2915,25 @@ with CodroidClient(host=ROBOT_IP) as robot:
 
     sub = robot.SubscribePublishTopic(PublishTopics.ROBOT_STATUS, on_status)
 
-    # --- 全局变量 ---
-    robot.SaveGlobalVar("test_var", GlobalVariable(value=42, note="测试"))
+    # --- Global Variables ---
+    robot.SaveGlobalVar("test_var", GlobalVariable(value=42, note="test"))
     response = robot.GetGlobalVars()
-    print(f"全局变量: {response.db}")
+    print(f"Global vars: {response.db}")
     robot.RemoveGlobalVars(["test_var"])
 
-    # --- 运动学 ---
+    # --- Kinematics ---
     fk = robot.AposToCpos([0, 0, 90, 0, 90, 0])
-    print(f"正解结果: {fk.db}")
+    print(f"FK result: {fk.db}")
 
     ik = robot.CposToApos([400, 200, 500, 180, 0, 90])
-    print(f"逆解结果: {ik.db}")
+    print(f"IK result: {ik.db}")
 
     rel = robot.CalculateRelativePose(
         pos=[400, 200, 500, 180, 0, 90],
         offset=[0, 0, -100, 0, 0, 0],
         coor_type=CoordinateType.TOOL,
     )
-    print(f"偏移结果: {rel.db}")
+    print(f"Offset result: {rel.db}")
 
     sub.dispose()
 ```
