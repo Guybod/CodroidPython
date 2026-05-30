@@ -1,4 +1,4 @@
-# Changelog
+# Codroid Python SDK 版本说明
 
 ## 2.1.4 — blend 参数改为可选
 

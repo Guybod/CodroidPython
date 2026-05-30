@@ -127,7 +127,7 @@ with CodroidClient(host="192.168.1.136") as robot:
 
 `MotionWaitOptions` 可调整超时、轮询间隔、到达容差等参数。
 
-**Breaking（2.1.1）**：公开 API 与 C# 一致，统一 **PascalCase**（`Connect`、`SwitchOn`、`GetDi`、`MovJ`、`SetToolFrame` 等）；`CriData` 为属性；`move_j` / `switch_on` 等 snake_case 已移除。见 [CHANGELOG.md](CHANGELOG.md)。
+**Breaking（2.1.1）**：公开 API 与 C# 一致，统一 **PascalCase**（`Connect`、`SwitchOn`、`GetDi`、`MovJ`、`SetToolFrame` 等）；`CriData` 为属性；`move_j` / `switch_on` 等 snake_case 已移除。见 [RELEASE_NOTES.md](RELEASE_NOTES.md)。
 
 ## Windows 控制台 UTF-8
 
