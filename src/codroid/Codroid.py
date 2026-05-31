@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import copy
 import threading
 import socket
 import time
@@ -35,6 +36,7 @@ class CodroidSession:
         """
         self._net = JsonStreamClient(host, port)
         self._id_counter = 1
+        self._id_lock = threading.Lock()
         self.debug = False
         # --- 新增属性 ---
         self.local_ip = local_ip
@@ -55,9 +57,11 @@ class CodroidSession:
         Returns:
             CommonResponse: 响应对象 / Response object.
         """
-        self._id_counter += 1
+        with self._id_lock:
+            self._id_counter += 1
+            current_id = self._id_counter
         # 构造请求模型
-        request = CodroidRequest(id=self._id_counter, ty=ty, db=db)
+        request = CodroidRequest(id=current_id, ty=ty, db=db)
         
         # 转换为字典并发送 (排除 db 为 None 的情况可根据具体接口微调)
         payload: Dict[str, Any] = {
@@ -173,8 +177,9 @@ class CodroidSession:
 
     @property
     def CriData(self) -> Optional[CriRealTimeData]:
-        """最新 CRI 快照（C# ``CriData``，内部 ``cri_cache``）。"""
-        return self.cri_cache
+        """最新 CRI 快照（线程安全深拷贝，与 C# ``CriData`` 行为一致）。"""
+        cache = self.cri_cache
+        return copy.deepcopy(cache) if cache is not None else None
 
     def WaitForCriData(self, timeout: float = 5.0) -> CriRealTimeData:
         """
@@ -298,7 +303,7 @@ class CodroidSession:
         """
         2.5 单步运行（C# ``RunStep``）。
         """
-        return self._send_command("project/run", {"id": project_id})
+        return self._send_command("project/runStep", {"id": project_id})
 
     def PauseProject(self) -> CommonResponse:
         """
@@ -542,9 +547,10 @@ class CodroidSession:
         Returns:
             CommonResponse: 响应对象 / Response object.
         """
-        # 处理默认参考关节角
+        # 处理默认参考关节角：优先用当前关节角度，CRI 未启动时兜底
         if rj is None:
-            rj = [20.0, 20.0, 20.0, 20.0, 20.0, 20.0]
+            cri = self.CriData
+            rj = list(cri.joint_position) if cri is not None and len(cri.joint_position) >= 6 else [20.0, 20.0, 20.0, 20.0, 20.0, 20.0]
             
         db = {
             "cp": cp, 
@@ -724,6 +730,7 @@ class CodroidSession:
         speed: float,
         acceleration: float,
         blend: Optional[float] = None,
+        relative_blend: Optional[float] = None,
         coor: Optional[Sequence[float]] = None,
         tool: Optional[Sequence[float]] = None,
     ) -> CommonResponse:
@@ -740,6 +747,7 @@ class CodroidSession:
                 speed,
                 acceleration,
                 blend=blend,
+                relative_blend=relative_blend,
                 coor=coor,
                 tool=tool,
             )
@@ -749,6 +757,7 @@ class CodroidSession:
             speed,
             acceleration,
             blend=blend,
+            relative_blend=relative_blend,
             coor=coor,
             tool=tool,
         )
@@ -760,6 +769,7 @@ class CodroidSession:
         speed: float,
         acceleration: float,
         blend: Optional[float] = None,
+        relative_blend: Optional[float] = None,
         coor: Optional[Sequence[float]] = None,
         tool: Optional[Sequence[float]] = None,
     ) -> CommonResponse:
@@ -775,6 +785,7 @@ class CodroidSession:
                 speed,
                 acceleration,
                 blend=blend,
+                relative_blend=relative_blend,
                 coor=coor,
                 tool=tool,
             )
@@ -784,6 +795,7 @@ class CodroidSession:
             speed,
             acceleration,
             blend=blend,
+            relative_blend=relative_blend,
             coor=coor,
             tool=tool,
         )
@@ -796,6 +808,7 @@ class CodroidSession:
         speed: float,
         acceleration: float,
         blend: Optional[float] = None,
+        relative_blend: Optional[float] = None,
         coor: Optional[Sequence[float]] = None,
         tool: Optional[Sequence[float]] = None,
     ) -> CommonResponse:
@@ -806,6 +819,7 @@ class CodroidSession:
             speed,
             acceleration,
             blend=blend,
+            relative_blend=relative_blend,
             coor=coor,
             tool=tool,
         )
@@ -819,6 +833,7 @@ class CodroidSession:
         speed: float,
         acceleration: float,
         blend: Optional[float] = None,
+        relative_blend: Optional[float] = None,
         coor: Optional[Sequence[float]] = None,
         tool: Optional[Sequence[float]] = None,
     ) -> CommonResponse:
@@ -830,6 +845,7 @@ class CodroidSession:
             speed,
             acceleration,
             blend=blend,
+            relative_blend=relative_blend,
             coor=coor,
             tool=tool,
         )
@@ -1013,6 +1029,7 @@ class CodroidSession:
         speed: float, acceleration: float,
         wait: Optional[MotionWaitOptions] = None,
         blend: Optional[float] = None,
+        relative_blend: Optional[float] = None,
         coor: Optional[Sequence[float]] = None,
         tool: Optional[Sequence[float]] = None,
     ) -> bool:
@@ -1024,7 +1041,8 @@ class CodroidSession:
             speed: 速度。
             acceleration: 加速度。
             wait: 等待参数，None 使用默认值。
-            blend: 平滑半径。
+            blend: 平滑半径。与 relative_blend 互斥。
+            relative_blend: 相对平滑比（0-100）。与 blend 互斥。
             coor: 用户坐标系。
             tool: 工具坐标系。
 
@@ -1032,7 +1050,7 @@ class CodroidSession:
             bool: 到达目标返回 True。
         """
         options = wait or MotionWaitOptions()
-        self.MovJ(target, speed, acceleration, blend=blend, coor=coor, tool=tool)
+        self.MovJ(target, speed, acceleration, blend=blend, relative_blend=relative_blend, coor=coor, tool=tool)
         if isinstance(target, JointPoint):
             predicate = (lambda jp: lambda data:
                 self._max_abs_diff(data.joint_position, jp) <= options.joint_tolerance_deg
@@ -1050,6 +1068,7 @@ class CodroidSession:
         speed: float, acceleration: float,
         wait: Optional[MotionWaitOptions] = None,
         blend: Optional[float] = None,
+        relative_blend: Optional[float] = None,
         coor: Optional[Sequence[float]] = None,
         tool: Optional[Sequence[float]] = None,
     ) -> bool:
@@ -1061,7 +1080,8 @@ class CodroidSession:
             speed: 速度。
             acceleration: 加速度。
             wait: 等待参数，None 使用默认值。
-            blend: 平滑半径。
+            blend: 平滑半径。与 relative_blend 互斥。
+            relative_blend: 相对平滑比（0-100）。与 blend 互斥。
             coor: 用户坐标系。
             tool: 工具坐标系。
 
@@ -1069,7 +1089,7 @@ class CodroidSession:
             bool: 到达目标返回 True。
         """
         options = wait or MotionWaitOptions()
-        self.MovL(target, speed, acceleration, blend=blend, coor=coor, tool=tool)
+        self.MovL(target, speed, acceleration, blend=blend, relative_blend=relative_blend, coor=coor, tool=tool)
         if isinstance(target, JointPoint):
             predicate = (lambda jp: lambda data:
                 self._max_abs_diff(data.joint_position, jp) <= options.joint_tolerance_deg
@@ -1088,6 +1108,7 @@ class CodroidSession:
         speed: float, acceleration: float,
         wait: Optional[MotionWaitOptions] = None,
         blend: Optional[float] = None,
+        relative_blend: Optional[float] = None,
         coor: Optional[Sequence[float]] = None,
         tool: Optional[Sequence[float]] = None,
     ) -> bool:
@@ -1098,8 +1119,8 @@ class CodroidSession:
             bool: 到达目标返回 True。
         """
         options = wait or MotionWaitOptions()
-        self.MovC(middle, target, speed, acceleration, blend=blend, coor=coor, tool=tool)
-        inst = MoveInstruction.MovC(middle, target, speed, acceleration, blend=blend, coor=coor, tool=tool)
+        self.MovC(middle, target, speed, acceleration, blend=blend, relative_blend=relative_blend, coor=coor, tool=tool)
+        inst = MoveInstruction.MovC(middle, target, speed, acceleration, blend=blend, relative_blend=relative_blend, coor=coor, tool=tool)
         cmds = [inst.to_dict()]
         predicate = self._build_move_target_reached_predicate(cmds, options)
         self._wait_until_settled_by_cri(predicate, "MovCSync", options)
@@ -1113,6 +1134,7 @@ class CodroidSession:
         speed: float, acceleration: float,
         wait: Optional[MotionWaitOptions] = None,
         blend: Optional[float] = None,
+        relative_blend: Optional[float] = None,
         coor: Optional[Sequence[float]] = None,
         tool: Optional[Sequence[float]] = None,
     ) -> bool:
@@ -1123,8 +1145,8 @@ class CodroidSession:
             bool: 到达目标返回 True。
         """
         options = wait or MotionWaitOptions()
-        self.MovCircle(middle, target, circle_num, speed, acceleration, blend=blend, coor=coor, tool=tool)
-        inst = MoveInstruction.MovCircle(middle, target, circle_num, speed, acceleration, blend=blend, coor=coor, tool=tool)
+        self.MovCircle(middle, target, circle_num, speed, acceleration, blend=blend, relative_blend=relative_blend, coor=coor, tool=tool)
+        inst = MoveInstruction.MovCircle(middle, target, circle_num, speed, acceleration, blend=blend, relative_blend=relative_blend, coor=coor, tool=tool)
         cmds = [inst.to_dict()]
         predicate = self._build_move_target_reached_predicate(cmds, options)
         self._wait_until_settled_by_cri(predicate, "MovCircleSync", options)
@@ -1267,6 +1289,7 @@ class CodroidSession:
         Returns:
             int: 0 或 1 / 0 or 1.
         """
+        self._validate_io(IOType.DI, port)
         res = self.GetIoValues([{"type": IOType.DI, "port": port}])
         if res.db is not None and len(res.db) > 0:
             return int(res.db[0]["value"])
@@ -1283,6 +1306,7 @@ class CodroidSession:
         Returns:
             int: 0 或 1 / 0 or 1.
         """
+        self._validate_io(IOType.DO, port)
         res = self.GetIoValues([{"type": IOType.DO, "port": port}])
         if res.db is not None and len(res.db) > 0:
             return int(res.db[0]["value"])
@@ -1497,10 +1521,16 @@ class CodroidSession:
         17.6 开启实时控制 / Start CRI control mode（C# ``StartCriControl``，``CRI/StartControl``）。
 
         Args:
-            filter_type: 滤波类型。
+            filter_type: 滤波类型（0=关闭，1=平均，2=二阶低通，3=椭圆）。
             duration: 指令间隔 ms（1–16，且可整除 1000）。
             start_buffer: 启动缓冲点数（1–100）。
         """
+        if int(filter_type) not in (0, 1, 2, 3):
+            raise ValueError(f"filter_type 须为 0-3，收到 {int(filter_type)}")
+        if not (1 <= duration <= 16) or 1000 % duration != 0:
+            raise ValueError(f"duration 须为 1-16 且整除 1000，收到 {duration}")
+        if not (1 <= start_buffer <= 100):
+            raise ValueError(f"start_buffer 须为 1-100，收到 {start_buffer}")
         db = {
             "filterType": int(filter_type),
             "duration": duration,

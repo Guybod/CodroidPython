@@ -1,5 +1,24 @@
 # Codroid Python SDK 版本说明
 
+## 2.1.5 — 隐患修复
+
+### Bug Fixes
+
+- **修复 `RunStep` 发错指令**：发送 `"project/run"` 改为 `"project/runStep"`，之前会导致单步调试变成完整运行
+- **修复 `CriData` 返回可变引用**：改为返回深拷贝，与 C# 行为一致，避免 UDP 线程更新时主线程读到不一致数据
+- **修复 `_id_counter` 竞态**：加 `threading.Lock` 保护，避免多线程并发发指令时 ID 冲突
+- **修复 `GetDi`/`GetDo` 缺少端口校验**：与 `SetDo`/`SetAo` 一致，传入非法端口时抛出 `CodroidError`
+- **修复 `_dispatch_publish` 静默吞异常**：publish handler 的异常现在会输出到日志
+
+### 改进
+
+- **`StartCriControl` 参数校验**：新增 `filter_type`（0-3）、`duration`（1-16 且整除 1000）、`start_buffer`（1-100）校验
+- **便捷运动方法补 `relative_blend` 参数**：`MovJ`、`MovL`、`MovC`、`MovCircle` 及其 `*Sync` 变体、`MotionPath` 构建方法全部支持 `relative_blend`，与 C# 对齐
+- **`CposToApos` 默认参考关节改为当前关节角度**：`rj=None` 时优先使用 `CriData.JointPosition`，CRI 未启动时兜底 `[20,20,20,20,20,20]`，与 C# 行为一致
+- **`CriStreamHandler.parse_packet()` 舍位方式修正**：从银行家舍位改为四舍五入（AwayFromZero），与 C# `Math.Round` 行为一致
+
+---
+
 ## 2.1.4 — blend 参数改为可选 + 欧拉角判定修复
 
 ### Bug Fixes

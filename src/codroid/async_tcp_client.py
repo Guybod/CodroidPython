@@ -214,7 +214,8 @@ class TransportClient(JsonStreamClient):
         for handler in handlers:
             try:
                 handler(ty, db, raw_json)
-            except Exception:
+            except Exception as e:
+                logger.warning("publish handler error [%s]: %s", ty, e)
                 continue
 
     def _fail_all_pending(self, exc: BaseException):

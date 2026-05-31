@@ -189,13 +189,13 @@ class CriStreamHandler:
             if self.mask & (1 << 8):
                 fmt = f"<{self.joint_count}{self.float_fmt}"
                 raw_jp = struct.unpack_from(fmt, data, offset)
-                res.joint_pos = [round(math.degrees(q), 3) for q in raw_jp]
+                res.joint_pos = [_round_away_from_zero(math.degrees(q)) for q in raw_jp]
                 offset += self.joint_count * self.float_size
 
             if self.mask & (1 << 9):
                 fmt = f"<{self.joint_count}{self.float_fmt}"
                 raw_jv = struct.unpack_from(fmt, data, offset)
-                res.joint_vel = [round(math.degrees(q), 3) for q in raw_jv]
+                res.joint_vel = [_round_away_from_zero(math.degrees(q)) for q in raw_jv]
                 offset += self.joint_count * self.float_size
 
             if self.mask & (1 << 10):
@@ -204,13 +204,13 @@ class CriStreamHandler:
                 raw_cp = struct.unpack_from(fmt, data, offset)
 
                 converted_cp = [
-                    round(raw_cp[0] * 1000.0, 3),
-                    round(raw_cp[1] * 1000.0, 3),
-                    round(raw_cp[2] * 1000.0, 3),
+                    _round_away_from_zero(raw_cp[0] * 1000.0),
+                    _round_away_from_zero(raw_cp[1] * 1000.0),
+                    _round_away_from_zero(raw_cp[2] * 1000.0),
                 ]
-                converted_cp.extend([round(math.degrees(a), 3) for a in raw_cp[3:6]])
+                converted_cp.extend([_round_away_from_zero(math.degrees(a)) for a in raw_cp[3:6]])
                 if count == 7:
-                    converted_cp.append(round(math.degrees(raw_cp[6]), 3))
+                    converted_cp.append(_round_away_from_zero(math.degrees(raw_cp[6])))
 
                 res.cartesian_pos = converted_cp
                 offset += count * self.float_size
@@ -219,37 +219,37 @@ class CriStreamHandler:
                 fmt = f"<{6}{self.float_fmt}"
                 raw_cv = struct.unpack_from(fmt, data, offset)
                 res.cartesian_vel = [
-                    round(raw_cv[0] * 1000.0, 3),
-                    round(raw_cv[1] * 1000.0, 3),
-                    round(raw_cv[2] * 1000.0, 3),
-                    round(math.degrees(raw_cv[3]), 3),
-                    round(math.degrees(raw_cv[4]), 3),
-                    round(math.degrees(raw_cv[5]), 3),
+                    _round_away_from_zero(raw_cv[0] * 1000.0),
+                    _round_away_from_zero(raw_cv[1] * 1000.0),
+                    _round_away_from_zero(raw_cv[2] * 1000.0),
+                    _round_away_from_zero(math.degrees(raw_cv[3])),
+                    _round_away_from_zero(math.degrees(raw_cv[4])),
+                    _round_away_from_zero(math.degrees(raw_cv[5])),
                 ]
                 offset += 6 * self.float_size
 
             if self.mask & (1 << 12):
                 raw_tcp = struct.unpack_from(f"<{self.float_fmt}", data, offset)[0]
-                res.tcp_speed = round(raw_tcp * 1000.0, 3)
+                res.tcp_speed = _round_away_from_zero(raw_tcp * 1000.0)
                 offset += self.float_size
 
             if self.mask & (1 << 13):
                 fmt = f"<{self.joint_count}{self.float_fmt}"
                 raw_jt = struct.unpack_from(fmt, data, offset)
-                res.joint_torque = [round(q, 3) for q in raw_jt]
+                res.joint_torque = [_round_away_from_zero(q) for q in raw_jt]
                 offset += self.joint_count * self.float_size
 
             if self.mask & (1 << 14):
                 fmt = f"<{self.joint_count}{self.float_fmt}"
                 raw_et = struct.unpack_from(fmt, data, offset)
-                res.external_torque = [round(q, 3) for q in raw_et]
+                res.external_torque = [_round_away_from_zero(q) for q in raw_et]
                 offset += self.joint_count * self.float_size
 
             if self.mask & (1 << 15):
                 if self.extra_axis_count > 0:
                     fmt = f"<{self.extra_axis_count}{self.float_fmt}"
                     raw_ep = struct.unpack_from(fmt, data, offset)
-                    res.extra_axis_pos = [round(q, 3) for q in raw_ep]
+                    res.extra_axis_pos = [_round_away_from_zero(q) for q in raw_ep]
                     offset += self.extra_axis_count * self.float_size
 
         except struct.error as e:

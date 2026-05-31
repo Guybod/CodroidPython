@@ -648,9 +648,10 @@ class MotionPath:
         speed: float,
         acc: float,
         blend: Optional[float] = None,
+        relative_blend: Optional[float] = None,
     ) -> MotionPath:
         """添加关节运动 movJ。"""
-        return self._add_item(MotionType.MOVJ, target, speed, acc, blend)
+        return self._add_item(MotionType.MOVJ, target, speed, acc, blend, relative_blend=relative_blend)
 
     def MovL(
         self,
@@ -658,9 +659,10 @@ class MotionPath:
         speed: float,
         acc: float,
         blend: Optional[float] = None,
+        relative_blend: Optional[float] = None,
     ) -> MotionPath:
         """添加直线运动 movL。"""
-        return self._add_item(MotionType.MOVL, target, speed, acc, blend)
+        return self._add_item(MotionType.MOVL, target, speed, acc, blend, relative_blend=relative_blend)
 
     def MovC(
         self,
@@ -669,6 +671,7 @@ class MotionPath:
         speed: float,
         acc: float,
         blend: Optional[float] = None,
+        relative_blend: Optional[float] = None,
     ) -> MotionPath:
         """添加圆弧运动 movC（目标与中间点均为 TCP）。"""
         target_mp = (
@@ -687,6 +690,7 @@ class MotionPath:
             speed,
             acc,
             blend,
+            relative_blend=relative_blend,
             middle=middle_mp,
         )
 

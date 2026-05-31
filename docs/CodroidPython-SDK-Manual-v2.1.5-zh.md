@@ -1,6 +1,6 @@
 # CodroidPython SDK 手册
 
-**版本:** 2.1.4 | **包名:** `codroid-robot-sdk` | **Python:** 3.7+
+**版本:** 2.1.5 | **包名:** `codroid-robot-sdk` | **Python:** 3.7+
 
 ---
 
@@ -2059,7 +2059,7 @@ with CodroidClient(host="192.168.8.136") as robot:
 #### blend / relative_blend
 
 - `blend`：平滑半径。与 `relative_blend` 互斥——同时传入时 `relative_blend` 无效。不传表示无过渡。
-- `relative_blend`：相对平滑比（0–1）。与 `blend` 互斥——同时传入时此参数无效。
+- `relative_blend`：相对平滑比（0–100）。与 `blend` 互斥——同时传入时此参数无效。
 
 #### coor / tool
 

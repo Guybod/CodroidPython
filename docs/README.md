@@ -1,6 +1,6 @@
 # CodroidPython SDK 手册
 
-**版本:** 2.1.4 | **包名:** `codroid-robot-sdk` | **Python:** 3.7+
+**版本:** 2.1.5 | **包名:** `codroid-robot-sdk` | **Python:** 3.7+
 
 ---
 

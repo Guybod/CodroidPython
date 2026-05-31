@@ -1,6 +1,6 @@
 # CodroidPython SDK Manual
 
-**Version:** 2.1.4 | **Package:** `codroid-robot-sdk` | **Python:** 3.7+
+**Version:** 2.1.5 | **Package:** `codroid-robot-sdk` | **Python:** 3.7+
 
 ---
 
