@@ -1,5 +1,19 @@
 # Codroid Python SDK 版本说明
 
+## 2.1.6 — 跨语言对齐修复
+
+### Bug Fixes
+
+- **修复 `blend`/`relativeBlend` 互斥逻辑**：注释说"互斥"，但代码两个都发。现在改为 `blend is not None` 时只发 `blend`，否则才发 `relative_blend`
+- **修复 publish handler 阻塞接收线程**：`_dispatch_publish` 中 handler 原先在接收线程上同步执行，慢 handler 会阻塞所有消息接收。现在改为 `threading.Thread(daemon=True)` 后台调用，与 C# `Task.Run` 行为对齐
+
+### 改进
+
+- **新增接收缓冲区溢出保护**：`TransportClient._receive_loop` 中新增 512KB 缓冲区上限（与 C++ `cmd_buffer_` 限制对齐），超限后清空缓冲区并断开连接，防止内存无限增长
+- **新增 publish 订阅去重**：`TransportClient` 新增 `_publish_wire_sent` 集合，同一 topic 只发送一次 `{ty, tc}` 订阅帧，与 C++ / C# 行为对齐
+
+---
+
 ## 2.1.5 — 隐患修复
 
 ### Bug Fixes

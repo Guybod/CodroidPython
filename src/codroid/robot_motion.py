@@ -69,9 +69,10 @@ def pack_instruction(
         "acc": acc,
         "targetPoint": pack_move_point(target),
     }
+    # blend 与 relativeBlend 互斥：同时传入时 relativeBlend 不下发
     if blend is not None:
         item["blend"] = blend
-    if relative_blend is not None:
+    elif relative_blend is not None:
         item["relativeBlend"] = relative_blend
 
     if middle is not None:

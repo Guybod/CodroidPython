@@ -98,6 +98,7 @@ class TransportClient(JsonStreamClient):
         self._publish_lock = threading.Lock()
         self._pending: Dict[int, _PendingRequest] = {}
         self._publish_handlers: Dict[str, List[PublishCallback]] = {}
+        self._publish_wire_sent: set = set()  # 已发送过 {ty, tc} 订阅帧的 topic 集合（去重）
         self._recv_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
 
@@ -136,6 +137,10 @@ class TransportClient(JsonStreamClient):
         return pending.response
 
     def send_publish_subscription(self, topic_ty: str, tc_ms: int = 100):
+        # 去重：同一 topic 只发送一次订阅帧（与 C++ / C# 对齐）
+        if topic_ty in self._publish_wire_sent:
+            return
+        self._publish_wire_sent.add(topic_ty)
         payload = {"ty": topic_ty, "tc": tc_ms}
         with self._write_lock:
             self.send(payload)
@@ -160,6 +165,9 @@ class TransportClient(JsonStreamClient):
         self._recv_thread = threading.Thread(target=self._receive_loop, daemon=True)
         self._recv_thread.start()
 
+    # 缓冲区溢出保护阈值（与 C++ cmd_buffer_ 512KB 限制对齐）
+    _MAX_BUFFER_SIZE = 512 * 1024
+
     def _receive_loop(self):
         try:
             while not self._stop_event.is_set():
@@ -178,6 +186,13 @@ class TransportClient(JsonStreamClient):
                     self._fail_all_pending(CodroidNetworkError("服务端关闭连接 / Server closed connection"))
                     return
                 self._buffer += chunk
+                # 缓冲区溢出保护：超过 512KB 仍未解析出完整 JSON，清空缓冲区防止内存无限增长
+                if len(self._buffer) > self._MAX_BUFFER_SIZE:
+                    self._buffer = ""
+                    self._fail_all_pending(CodroidNetworkError(
+                        f"接收缓冲区溢出 / Buffer overflow: exceeded {self._MAX_BUFFER_SIZE} bytes without complete JSON"
+                    ))
+                    return
                 self._consume_buffer_messages()
         except BaseException as e:
             self._fail_all_pending(CodroidNetworkError(f"接收线程异常 / Receiver crashed: {e}"))
@@ -211,12 +226,14 @@ class TransportClient(JsonStreamClient):
     def _dispatch_publish(self, ty: str, db: Any, raw_json: str):
         with self._publish_lock:
             handlers = list(self._publish_handlers.get(ty, []))
+        # 在后台线程中调用 handler，避免慢 handler 阻塞接收线程（与 C# Task.Run 对齐）
         for handler in handlers:
-            try:
-                handler(ty, db, raw_json)
-            except Exception as e:
-                logger.warning("publish handler error [%s]: %s", ty, e)
-                continue
+            def _run(h=handler):
+                try:
+                    h(ty, db, raw_json)
+                except Exception as e:
+                    logger.warning("publish handler error [%s]: %s", ty, e)
+            threading.Thread(target=_run, daemon=True).start()
 
     def _fail_all_pending(self, exc: BaseException):
         with self._pending_lock:
