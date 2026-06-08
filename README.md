@@ -133,7 +133,6 @@ with CodroidClient(host="192.168.1.136") as robot:
     robot.MovJSync(JointPoint.Degrees([0, 0, 90, 0, 90, 0]), speed=40, acceleration=100)
 
     # 自定义等待参数
-    opts = MotionWaitOptions(timeout=30.0, joint_tolerance_deg=0.5)
     robot.MovLSync(CartesianPoint.MmDeg([400, 200, 500, 180, 0, 90]),
                    speed=150, acceleration=500, wait=opts)
 ```

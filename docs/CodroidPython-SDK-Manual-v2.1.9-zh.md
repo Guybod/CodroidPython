@@ -918,9 +918,6 @@ class MotionWaitOptions:
     poll_interval: float = 0.05                     # 轮询间隔（秒）
     cri_stale_timeout: float = 0.5                  # CRI 数据过期判定（秒）
     settled_samples: int = 3                        # 连续稳定采样数
-    joint_tolerance_deg: float = 0.2                # ⚠️ 已废弃
-    cartesian_position_tolerance_mm: float = 1.0    # ⚠️ 已废弃
-    cartesian_orientation_tolerance_deg: float = 1.0 # ⚠️ 已废弃
 ```
 
 ```python

@@ -756,9 +756,6 @@ class MotionWaitOptions:
     poll_interval: float = 0.05                        # Poll interval (seconds)
     cri_stale_timeout: float = 0.5                     # CRI data stale threshold (seconds)
     settled_samples: int = 3                           # Consecutive settled sample count
-    joint_tolerance_deg: float = 0.2                   # ⚠️ Deprecated
-    cartesian_position_tolerance_mm: float = 1.0       # ⚠️ Deprecated
-    cartesian_orientation_tolerance_deg: float = 1.0   # ⚠️ Deprecated
 ```
 
 ```python

@@ -377,15 +377,11 @@ class MotionWaitOptions:
     poll_interval: float = 0.05                     # 轮询间隔（秒）
     cri_stale_timeout: float = 0.5                  # CRI 数据过期判定（秒）
     settled_samples: int = 3                        # 连续稳定采样数
-    joint_tolerance_deg: float = 0.2                # 关节容差（度）
-    cartesian_position_tolerance_mm: float = 1.0    # 笛卡尔位置容差（mm）
-    cartesian_orientation_tolerance_deg: float = 1.0 # 笛卡尔姿态容差（度）
 ```
 
 ```python
 from codroid import MotionWaitOptions
 
-opts = MotionWaitOptions(timeout=30.0, joint_tolerance_deg=0.5)
 robot.MovJSync(JointPoint.Degrees([0, 0, 90, 0, 90, 0]),
                speed=40, acceleration=100, wait=opts)
 ```
