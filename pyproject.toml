@@ -35,9 +35,9 @@ color = [
 ]
 
 [project.urls]
-Documentation = "https://guybod.github.io/CodroidSDK/"
-Issues = "https://github.com/guybod/CodroidSDK/issues"
-Source = "https://github.com/guybod/CodroidSDK"
+Documentation = "https://guybod.github.io/CodroidPython/"
+Issues = "https://github.com/Guybod/CodroidPython/issues"
+Source = "https://github.com/Guybod/CodroidPython"
 
 [tool.hatch.version]
 path = "src/codroid/__about__.py"
