@@ -1,6 +1,6 @@
 # Codroid Python SDK 版本说明
 
-## 2.1.8 — Sync 判定逻辑简化
+## 2.1.9 — Sync 判定逻辑简化（PyPI 2.1.8 已删除，跳版本号）
 
 ### Breaking Change
 
