@@ -1,6 +1,6 @@
 # CodroidPython SDK 手册
 
-**版本:** 2.1.7 | **包名:** `codroid-robot-sdk` | **Python:** 3.7+
+**版本:** 2.1.8 | **包名:** `codroid-robot-sdk` | **Python:** 3.7+
 
 ---
 
@@ -744,7 +744,9 @@ robot.Move(path)
 
 ### 阻塞式运动指令
 
-`*Sync` 方法发送运动指令后自动轮询 CRI 数据，直到机器人稳定到达目标。需要先启动 CRI 数据推送。
+`*Sync` 方法发送运动指令后自动轮询 CRI 数据，直到机器人停稳。需要先启动 CRI 数据推送。
+
+> **2.1.8 行为变更**：完成判定仅依据 CRI `InMotion` 标志（曾经运动 + 连续 `settled_samples` 次停稳），**不再**比对关节角或 TCP 与目标点误差。`MotionWaitOptions` 的容差字段已废弃，不再生效。
 
 #### MovJSync
 
@@ -905,7 +907,9 @@ def MoveSync(
 
 #### MotionWaitOptions
 
-控制阻塞运动的等待行为：
+控制阻塞运动的等待行为。
+
+> **2.1.8 变更**：完成判定仅依据 CRI `InMotion` 标志，容差字段已废弃。
 
 ```python
 @dataclass
@@ -914,15 +918,15 @@ class MotionWaitOptions:
     poll_interval: float = 0.05                     # 轮询间隔（秒）
     cri_stale_timeout: float = 0.5                  # CRI 数据过期判定（秒）
     settled_samples: int = 3                        # 连续稳定采样数
-    joint_tolerance_deg: float = 0.2                # 关节容差（度）
-    cartesian_position_tolerance_mm: float = 1.0    # 笛卡尔位置容差（mm）
-    cartesian_orientation_tolerance_deg: float = 1.0 # 笛卡尔姿态容差（度）
+    joint_tolerance_deg: float = 0.2                # ⚠️ 已废弃
+    cartesian_position_tolerance_mm: float = 1.0    # ⚠️ 已废弃
+    cartesian_orientation_tolerance_deg: float = 1.0 # ⚠️ 已废弃
 ```
 
 ```python
 from codroid import MotionWaitOptions
 
-opts = MotionWaitOptions(timeout=30.0, joint_tolerance_deg=0.5)
+opts = MotionWaitOptions(timeout=30.0)
 robot.MovJSync(JointPoint.Degrees([0, 0, 90, 0, 90, 0]),
                speed=40, acceleration=100, wait=opts)
 ```
@@ -3384,7 +3388,7 @@ response = robot.CalculateRelativePose(
 print(f"偏移后位姿: {response.db}")
 ```
 
-#### CposToCpos / CposToCposPose（2.1.7+）
+#### CposToCpos / CposToCposPose（2.1.8+）
 
 坐标系转换：将 TCP 位姿从坐标系1+工具1 转换到坐标系2+工具2。协议 `Robot/cpostocpos`。
 

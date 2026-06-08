@@ -442,24 +442,29 @@ class MotionWaitOptions:
     阻塞运动等待参数（C# ``MotionWaitOptions``）。
 
     用于 ``MoveSync`` / ``MovJSync`` / ``MovLSync`` / ``MovCSync`` / ``MovCircleSync``
-    控制 CRI 轮询与到达判定行为。
+    控制 CRI 轮询行为。
+
+    .. deprecated::
+        v2.1.8：完成判定仅依据 CRI ``InMotion`` 标志，不再比对目标位置。
+        ``joint_tolerance_deg``、``cartesian_position_tolerance_mm``、
+        ``cartesian_orientation_tolerance_deg`` 已废弃，不再生效。
 
     Attributes:
         timeout: 整体等待超时（秒），默认 60。
         poll_interval: 轮询间隔（秒），默认 0.05。
         cri_stale_timeout: CRI 数据过期判定（秒），默认 0.5。
         settled_samples: ``InMotion=False`` 连续稳定采样数，默认 3。
-        joint_tolerance_deg: 关节目标容差（最大轴误差，度），默认 0.2。
-        cartesian_position_tolerance_mm: 笛卡尔位置容差（欧氏距离，mm），默认 1.0。
-        cartesian_orientation_tolerance_deg: 笛卡尔姿态容差（最大欧拉角误差，度），默认 1.0。
+        joint_tolerance_deg: 已废弃（v2.1.8）。
+        cartesian_position_tolerance_mm: 已废弃（v2.1.8）。
+        cartesian_orientation_tolerance_deg: 已废弃（v2.1.8）。
     """
     timeout: float = 60.0
     poll_interval: float = 0.05
     cri_stale_timeout: float = 0.5
     settled_samples: int = 3
-    joint_tolerance_deg: float = 0.2
-    cartesian_position_tolerance_mm: float = 1.0
-    cartesian_orientation_tolerance_deg: float = 1.0
+    joint_tolerance_deg: float = 0.2  # deprecated v2.1.8
+    cartesian_position_tolerance_mm: float = 1.0  # deprecated v2.1.8
+    cartesian_orientation_tolerance_deg: float = 1.0  # deprecated v2.1.8
 
 
 # =============================================================================

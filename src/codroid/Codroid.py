@@ -988,11 +988,10 @@ class CodroidSession:
 
     def _wait_until_settled_by_cri(
         self,
-        target_reached,
         op_name: str,
         options: "MotionWaitOptions",
     ) -> None:
-        """轮询 CRI 数据直到机器人稳定到达目标 / Poll CRI until robot settles at target."""
+        """轮询 CRI 数据直到机器人停稳 / Poll CRI until robot settles (v2.1.8: only check InMotion)."""
         if options.settled_samples <= 0:
             raise CodroidError("MotionWaitOptions.settled_samples must be > 0.")
         if options.poll_interval <= 0:
@@ -1009,8 +1008,6 @@ class CodroidSession:
                 time.sleep(options.poll_interval)
                 continue
 
-            reached = target_reached(snapshot)
-
             if snapshot.status.is_moving:
                 had_motion = True
 
@@ -1022,13 +1019,8 @@ class CodroidSession:
                     f"HasAlarm={snapshot.status.has_alarm})."
                 )
 
-            if had_motion and not snapshot.status.is_moving and not reached:
-                raise CodroidError(
-                    f"{op_name} failed: motion stopped but target not reached."
-                )
-
             still = not snapshot.status.is_moving
-            if reached and still:
+            if had_motion and still:
                 settled += 1
                 if settled >= options.settled_samples:
                     return
@@ -1062,14 +1054,7 @@ class CodroidSession:
         """
         options = wait or MotionWaitOptions()
         self.Move(path)
-        if isinstance(path, MotionPath):
-            cmds = path.get_commands()
-        elif isinstance(path, list) and path and isinstance(path[0], MoveInstruction):
-            cmds = [inst.to_dict() for inst in cast(List[MoveInstruction], path)]
-        else:
-            cmds = cast(List[Dict[str, Any]], path)
-        predicate = self._build_move_target_reached_predicate(cmds, options)
-        self._wait_until_settled_by_cri(predicate, "MoveSync", options)
+        self._wait_until_settled_by_cri("MoveSync", options)
         return True
 
     def MovJSync(
@@ -1100,15 +1085,7 @@ class CodroidSession:
         """
         options = wait or MotionWaitOptions()
         self.MovJ(target, speed, acceleration, blend=blend, relative_blend=relative_blend, coor=coor, tool=tool)
-        if isinstance(target, JointPoint):
-            predicate = (lambda jp: lambda data:
-                self._max_abs_diff(data.joint_position, jp) <= options.joint_tolerance_deg
-            )(list(target.jp))
-        else:
-            predicate = (lambda cp: lambda data:
-                self._is_cartesian_target_reached(data.tcp_pose, cp, options)
-            )(list(target.cp))
-        self._wait_until_settled_by_cri(predicate, "MovJSync", options)
+        self._wait_until_settled_by_cri("MovJSync", options)
         return True
 
     def MovLSync(
@@ -1139,15 +1116,7 @@ class CodroidSession:
         """
         options = wait or MotionWaitOptions()
         self.MovL(target, speed, acceleration, blend=blend, relative_blend=relative_blend, coor=coor, tool=tool)
-        if isinstance(target, JointPoint):
-            predicate = (lambda jp: lambda data:
-                self._max_abs_diff(data.joint_position, jp) <= options.joint_tolerance_deg
-            )(list(target.jp))
-        else:
-            predicate = (lambda cp: lambda data:
-                self._is_cartesian_target_reached(data.tcp_pose, cp, options)
-            )(list(target.cp))
-        self._wait_until_settled_by_cri(predicate, "MovLSync", options)
+        self._wait_until_settled_by_cri("MovLSync", options)
         return True
 
     def MovCSync(
@@ -1169,10 +1138,7 @@ class CodroidSession:
         """
         options = wait or MotionWaitOptions()
         self.MovC(middle, target, speed, acceleration, blend=blend, relative_blend=relative_blend, coor=coor, tool=tool)
-        inst = MoveInstruction.MovC(middle, target, speed, acceleration, blend=blend, relative_blend=relative_blend, coor=coor, tool=tool)
-        cmds = [inst.to_dict()]
-        predicate = self._build_move_target_reached_predicate(cmds, options)
-        self._wait_until_settled_by_cri(predicate, "MovCSync", options)
+        self._wait_until_settled_by_cri("MovCSync", options)
         return True
 
     def MovCircleSync(
@@ -1195,10 +1161,7 @@ class CodroidSession:
         """
         options = wait or MotionWaitOptions()
         self.MovCircle(middle, target, circle_num, speed, acceleration, blend=blend, relative_blend=relative_blend, coor=coor, tool=tool)
-        inst = MoveInstruction.MovCircle(middle, target, circle_num, speed, acceleration, blend=blend, relative_blend=relative_blend, coor=coor, tool=tool)
-        cmds = [inst.to_dict()]
-        predicate = self._build_move_target_reached_predicate(cmds, options)
-        self._wait_until_settled_by_cri(predicate, "MovCircleSync", options)
+        self._wait_until_settled_by_cri("MovCircleSync", options)
         return True
 
     # --- 12. 机器人控制命令 / Robot Control Commands ---

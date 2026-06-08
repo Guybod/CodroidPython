@@ -1,6 +1,6 @@
 # CodroidPython SDK Manual
 
-**Version:** 2.1.7 | **Package:** `codroid-robot-sdk` | **Python:** 3.7+
+**Version:** 2.1.8 | **Package:** `codroid-robot-sdk` | **Python:** 3.7+
 
 ---
 
@@ -650,7 +650,9 @@ robot.Move(path)
 
 ### Blocking Motion Commands
 
-`*Sync` methods send the motion command then automatically poll CRI data until the robot stably reaches the target. CRI data push must be started first.
+`*Sync` methods send the motion command then automatically poll CRI data until the robot stops. CRI data push must be started first.
+
+> **2.1.8 behavior change:** Completion is determined solely by the CRI `InMotion` flag (was moving + consecutive `settled_samples` stable reads). Joint/TCP position vs target is **no longer checked**. `MotionWaitOptions` tolerance fields are deprecated.
 
 #### MovJSync
 
@@ -743,7 +745,9 @@ Blocking path execution. Waits for CRI to confirm the last segment reached the t
 
 #### MotionWaitOptions
 
-Controls blocking motion wait behavior:
+Controls blocking motion wait behavior.
+
+> **2.1.8 change:** Completion is determined solely by the CRI `InMotion` flag. Tolerance fields are deprecated.
 
 ```python
 @dataclass
@@ -752,15 +756,15 @@ class MotionWaitOptions:
     poll_interval: float = 0.05                        # Poll interval (seconds)
     cri_stale_timeout: float = 0.5                     # CRI data stale threshold (seconds)
     settled_samples: int = 3                           # Consecutive settled sample count
-    joint_tolerance_deg: float = 0.2                   # Joint tolerance (degrees)
-    cartesian_position_tolerance_mm: float = 1.0       # Cartesian position tolerance (mm)
-    cartesian_orientation_tolerance_deg: float = 1.0   # Cartesian orientation tolerance (degrees)
+    joint_tolerance_deg: float = 0.2                   # ⚠️ Deprecated
+    cartesian_position_tolerance_mm: float = 1.0       # ⚠️ Deprecated
+    cartesian_orientation_tolerance_deg: float = 1.0   # ⚠️ Deprecated
 ```
 
 ```python
 from codroid import MotionWaitOptions
 
-opts = MotionWaitOptions(timeout=30.0, joint_tolerance_deg=0.5)
+opts = MotionWaitOptions(timeout=30.0)
 robot.MovJSync(JointPoint.Degrees([0, 0, 90, 0, 90, 0]),
                speed=40, acceleration=100, wait=opts)
 ```
@@ -2855,7 +2859,7 @@ response = robot.CalculateRelativePose(
 print(f"Offset pose: {response.db}")
 ```
 
-#### CposToCpos / CposToCposPose (2.1.7+)
+#### CposToCpos / CposToCposPose (2.1.8+)
 
 Coordinate system transformation: convert a TCP pose from coordinate system 1 + tool 1 to coordinate system 2 + tool 2. Protocol `Robot/cpostocpos`.
 
