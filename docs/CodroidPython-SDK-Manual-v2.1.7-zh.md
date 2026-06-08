@@ -1,6 +1,6 @@
 # CodroidPython SDK 手册
 
-**版本:** 2.1.5 | **包名:** `codroid-robot-sdk` | **Python:** 3.7+
+**版本:** 2.1.7 | **包名:** `codroid-robot-sdk` | **Python:** 3.7+
 
 ---
 
@@ -3382,6 +3382,48 @@ response = robot.CalculateRelativePose(
     coor_type=CoordinateType.TOOL,
 )
 print(f"偏移后位姿: {response.db}")
+```
+
+#### CposToCpos / CposToCposPose（2.1.7+）
+
+坐标系转换：将 TCP 位姿从坐标系1+工具1 转换到坐标系2+工具2。协议 `Robot/cpostocpos`。
+
+```python
+def CposToCpos(
+    self,
+    cp: Sequence[float],
+    coor1: Sequence[float],
+    tool1: Sequence[float],
+    coor2: Sequence[float],
+    tool2: Sequence[float],
+) -> List[float]
+```
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `cp` | `Sequence[float]` | 当前 TCP 位姿 `[x,y,z,a,b,c]`（mm+度） |
+| `coor1` | `Sequence[float]` | 源坐标系 `[x,y,z,a,b,c]` |
+| `tool1` | `Sequence[float]` | 源工具 `[x,y,z,a,b,c]` |
+| `coor2` | `Sequence[float]` | 目标坐标系 `[x,y,z,a,b,c]` |
+| `tool2` | `Sequence[float]` | 目标工具 `[x,y,z,a,b,c]` |
+
+```python
+result = robot.CposToCpos(
+    cp=[400, 200, 500, 180, 0, 90],
+    coor1=[0,0,0,0,0,0], tool1=[0,0,0,0,0,0],
+    coor2=[100,0,0,0,0,0], tool2=[0,0,100,0,0,0]
+)
+print(f"转换后位姿: {result}")
+```
+
+`CposToCposPose` 返回 `CartesianPoint`：
+
+```python
+pose = robot.CposToCposPose(
+    cp=CartesianPoint.MmDeg([400, 200, 500, 180, 0, 90]),
+    coor1=[0,0,0,0,0,0], tool1=[0,0,0,0,0,0],
+    coor2=[100,0,0,0,0,0], tool2=[0,0,100,0,0,0]
+)
 ```
 
 ---

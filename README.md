@@ -80,6 +80,19 @@ python3 demo.py
 | `MovCSync(middle, target, speed, acc, wait?)` | 阻塞式圆弧运动 |
 | `MoveSync(instructions, wait?)` | 阻塞式路径执行 |
 
+### 坐标系转换（2.1.7+）
+
+```python
+# 将 TCP 位姿从坐标系1+工具1 转换到坐标系2+工具2
+result = robot.CposToCpos(
+    cp=[400, 200, 500, 180, 0, 90],
+    coor1=[0,0,0,0,0,0], tool1=[0,0,0,0,0,0],
+    coor2=[100,0,0,0,0,0], tool2=[0,0,100,0,0,0]
+)
+# 或返回 CartesianPoint
+pose = robot.CposToCposPose(CartesianPoint.MmDeg([400,200,500,180,0,90]), ...)
+```
+
 四组合路径示例（与 C++ `04_move` 一致）：
 
 ```python

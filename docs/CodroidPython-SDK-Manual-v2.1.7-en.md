@@ -1,6 +1,6 @@
 # CodroidPython SDK Manual
 
-**Version:** 2.1.5 | **Package:** `codroid-robot-sdk` | **Python:** 3.7+
+**Version:** 2.1.7 | **Package:** `codroid-robot-sdk` | **Python:** 3.7+
 
 ---
 
@@ -2853,6 +2853,48 @@ response = robot.CalculateRelativePose(
     coor_type=CoordinateType.TOOL,
 )
 print(f"Offset pose: {response.db}")
+```
+
+#### CposToCpos / CposToCposPose (2.1.7+)
+
+Coordinate system transformation: convert a TCP pose from coordinate system 1 + tool 1 to coordinate system 2 + tool 2. Protocol `Robot/cpostocpos`.
+
+```python
+def CposToCpos(
+    self,
+    cp: Sequence[float],
+    coor1: Sequence[float],
+    tool1: Sequence[float],
+    coor2: Sequence[float],
+    tool2: Sequence[float],
+) -> List[float]
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `cp` | `Sequence[float]` | Current TCP pose `[x,y,z,a,b,c]` (mm+deg) |
+| `coor1` | `Sequence[float]` | Source coordinate system `[x,y,z,a,b,c]` |
+| `tool1` | `Sequence[float]` | Source tool `[x,y,z,a,b,c]` |
+| `coor2` | `Sequence[float]` | Target coordinate system `[x,y,z,a,b,c]` |
+| `tool2` | `Sequence[float]` | Target tool `[x,y,z,a,b,c]` |
+
+```python
+result = robot.CposToCpos(
+    cp=[400, 200, 500, 180, 0, 90],
+    coor1=[0,0,0,0,0,0], tool1=[0,0,0,0,0,0],
+    coor2=[100,0,0,0,0,0], tool2=[0,0,100,0,0,0]
+)
+print(f"Converted pose: {result}")
+```
+
+`CposToCposPose` returns `CartesianPoint`:
+
+```python
+pose = robot.CposToCposPose(
+    cp=CartesianPoint.MmDeg([400, 200, 500, 180, 0, 90]),
+    coor1=[0,0,0,0,0,0], tool1=[0,0,0,0,0,0],
+    coor2=[100,0,0,0,0,0], tool2=[0,0,100,0,0,0]
+)
 ```
 
 ---

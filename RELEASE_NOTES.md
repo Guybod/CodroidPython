@@ -1,5 +1,23 @@
 # Codroid Python SDK 版本说明
 
+## 2.1.7 — 补齐 CposToCpos + 跨语言对齐修复
+
+### 新增
+
+- **`CposToCpos` / `CposToCposPose`**：坐标系转换（协议 `Robot/cpostocpos`），将 TCP 位姿从坐标系1+工具1 转换到坐标系2+工具2，与 C# 对齐
+
+### Bug Fixes
+
+- **修复 `blend`/`relativeBlend` 互斥逻辑**：同时传入时只发 `blend`
+- **修复 publish handler 阻塞接收线程**：改为 `threading.Thread(daemon=True)` 后台调用
+
+### 改进
+
+- **新增接收缓冲区溢出保护**：512KB 缓冲区上限，超限后清空并断开
+- **新增 publish 订阅去重**：同一 topic 只发送一次订阅帧
+
+---
+
 ## 2.1.5 — 隐患修复
 
 ### Bug Fixes

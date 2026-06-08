@@ -589,6 +589,55 @@ class CodroidSession:
             
         return self._send_command("Robot/calculateRelativePose", db)
 
+    def CposToCpos(
+        self,
+        cp: Sequence[float],
+        coor1: Sequence[float],
+        tool1: Sequence[float],
+        coor2: Sequence[float],
+        tool2: Sequence[float],
+    ) -> List[float]:
+        """
+        10.4 坐标系转换 / Coordinate system transformation（C# ``CposToCposDouble``）。
+
+        将 TCP 位姿从坐标系1+工具1 转换到坐标系2+工具2。
+
+        Args:
+            cp: 当前 TCP 位姿 [x,y,z,a,b,c]（mm+度）。
+            coor1: 源坐标系 [x,y,z,a,b,c]。
+            tool1: 源工具 [x,y,z,a,b,c]。
+            coor2: 目标坐标系 [x,y,z,a,b,c]。
+            tool2: 目标工具 [x,y,z,a,b,c]。
+
+        Returns:
+            转换后的 TCP 位姿 [x,y,z,a,b,c]。
+        """
+        db = {
+            "cp": list(cp),
+            "coor1": list(coor1),
+            "tool1": list(tool1),
+            "coor2": list(coor2),
+            "tool2": list(tool2),
+        }
+        resp = self._send_command("Robot/cpostocpos", db)
+        return resp.db
+
+    def CposToCposPose(
+        self,
+        cp: CartesianPoint,
+        coor1: Sequence[float],
+        tool1: Sequence[float],
+        coor2: Sequence[float],
+        tool2: Sequence[float],
+    ) -> CartesianPoint:
+        """
+        10.4 坐标系转换（返回 CartesianPoint）/ Coordinate system transformation (returns CartesianPoint)。
+
+        将 TCP 位姿从坐标系1+工具1 转换到坐标系2+工具2。
+        """
+        pose = self.CposToCpos(cp.cp, coor1, tool1, coor2, tool2)
+        return CartesianPoint.MmDeg(pose)
+
     # --- 11. 机器人运动控制接口 / Robot Motion Control ---
 
     def StartJog(
