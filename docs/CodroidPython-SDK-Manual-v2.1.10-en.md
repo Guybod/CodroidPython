@@ -1,6 +1,6 @@
 # CodroidPython SDK Manual
 
-**Version:** 2.1.9 | **Package:** `codroid-robot-sdk` | **Python:** 3.7+
+**Version:** 2.1.10 | **Package:** `codroid-robot-sdk` | **Python:** 3.7+
 
 ---
 
@@ -652,7 +652,7 @@ robot.Move(path)
 
 `*Sync` methods send the motion command then automatically poll CRI data until the robot stops. CRI data push must be started first.
 
-> **2.1.9 behavior change:** Completion is determined solely by the CRI `InMotion` flag (was moving + consecutive `settled_samples` stable reads). Joint/TCP position vs target is **no longer checked**. `MotionWaitOptions` tolerance fields are deprecated.
+> **2.1.10 behavior change:** Completion is determined solely by the CRI `InMotion` flag (was moving + consecutive `settled_samples` stable reads). Joint/TCP position vs target is **no longer checked**. `MotionWaitOptions` tolerance fields are deprecated.
 
 #### MovJSync
 
@@ -747,7 +747,7 @@ Blocking path execution. Waits for CRI to confirm the last segment reached the t
 
 Controls blocking motion wait behavior.
 
-> **2.1.9 change:** Completion is determined solely by the CRI `InMotion` flag. Tolerance fields are deprecated.
+> **2.1.10 change:** Completion is determined solely by the CRI `InMotion` flag. Tolerance fields are deprecated.
 
 ```python
 @dataclass
@@ -2856,7 +2856,7 @@ response = robot.CalculateRelativePose(
 print(f"Offset pose: {response.db}")
 ```
 
-#### CposToCpos / CposToCposPose (2.1.9+)
+#### CposToCpos / CposToCposPose (2.1.10+)
 
 Coordinate system transformation: convert a TCP pose from coordinate system 1 + tool 1 to coordinate system 2 + tool 2. Protocol `Robot/cpostocpos`.
 

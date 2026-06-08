@@ -1,5 +1,13 @@
 # Codroid Python SDK 版本说明
 
+## 2.1.10 — 容差字段彻底移除
+
+### Breaking Change
+
+- **`MotionWaitOptions` 容差字段彻底移除**：`joint_tolerance_deg`、`cartesian_position_tolerance_mm`、`cartesian_orientation_tolerance_deg` 已删除，旧代码引用会报 `AttributeError`
+
+---
+
 ## 2.1.9 — Sync 判定逻辑简化（PyPI 2.1.8 已删除，跳版本号）
 
 ### Breaking Change

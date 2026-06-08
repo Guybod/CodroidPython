@@ -1,6 +1,6 @@
 # CodroidPython SDK 手册
 
-**版本:** 2.1.9 | **包名:** `codroid-robot-sdk` | **Python:** 3.7+
+**版本:** 2.1.10 | **包名:** `codroid-robot-sdk` | **Python:** 3.7+
 
 ---
 
@@ -746,7 +746,7 @@ robot.Move(path)
 
 `*Sync` 方法发送运动指令后自动轮询 CRI 数据，直到机器人停稳。需要先启动 CRI 数据推送。
 
-> **2.1.9 行为变更**：完成判定仅依据 CRI `InMotion` 标志（曾经运动 + 连续 `settled_samples` 次停稳），**不再**比对关节角或 TCP 与目标点误差。`MotionWaitOptions` 的容差字段已废弃，不再生效。
+> **2.1.10 行为变更**：完成判定仅依据 CRI `InMotion` 标志（曾经运动 + 连续 `settled_samples` 次停稳），**不再**比对关节角或 TCP 与目标点误差。`MotionWaitOptions` 的容差字段已废弃，不再生效。
 
 #### MovJSync
 
@@ -909,7 +909,7 @@ def MoveSync(
 
 控制阻塞运动的等待行为。
 
-> **2.1.9 变更**：完成判定仅依据 CRI `InMotion` 标志，容差字段已废弃。
+> **2.1.10 变更**：完成判定仅依据 CRI `InMotion` 标志，容差字段已废弃。
 
 ```python
 @dataclass
@@ -3385,7 +3385,7 @@ response = robot.CalculateRelativePose(
 print(f"偏移后位姿: {response.db}")
 ```
 
-#### CposToCpos / CposToCposPose（2.1.9+）
+#### CposToCpos / CposToCposPose（2.1.10+）
 
 坐标系转换：将 TCP 位姿从坐标系1+工具1 转换到坐标系2+工具2。协议 `Robot/cpostocpos`。
 
