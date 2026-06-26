@@ -5,6 +5,12 @@ from .__about__ import __version__
 from .Codroid import CodroidControlInterface, CodroidSession
 from .client import CodroidClient
 from .define import *
+from .define import (
+    ForceFrame,
+    ForceAxisMode,
+    ForceHealth,
+    ForceControlState,
+)
 from .exceptions import (
     CodroidCommandException,
     CodroidError,
@@ -84,4 +90,8 @@ __all__ = [
     "RobotFrame",
     "RobotPayloadFrame",
     "RobotParameters",
+    "ForceFrame",
+    "ForceAxisMode",
+    "ForceHealth",
+    "ForceControlState",
 ]

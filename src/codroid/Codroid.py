@@ -95,6 +95,47 @@ class CodroidSession:
         
         return response
 
+    def _send_action_command(self, action: str, db: Any = None) -> CommonResponse:
+        """
+        力控等 action 类型指令发送（使用 "action" 而非 "ty"）。
+
+        Args:
+            action (str): 动作名称，如 "initForceControl"。
+            db (Any): 请求数据。
+
+        Returns:
+            CommonResponse: 响应对象。
+        """
+        with self._id_lock:
+            self._id_counter += 1
+            current_id = self._id_counter
+
+        payload: Dict[str, Any] = {
+            "id": current_id,
+            "action": action,
+        }
+        if db is not None:
+            payload["db"] = db
+
+        if self.debug:
+            print(payload)
+        self._net.send(payload)
+        raw_res = self._net.receive_one()
+        if self.debug:
+            print(f"[recv]: {raw_res}")
+
+        response = CommonResponse(
+            id=raw_res.get("id", 0),
+            ty=raw_res.get("ty", ""),
+            db=raw_res.get("db"),
+            err=raw_res.get("err"),
+        )
+
+        if not response.is_success:
+            raise CodroidError(f"API Error [{action}]: {response.err}")
+
+        return response
+
     # --- 连接管理 / Connection Management ---
 
     def Connect(self) -> "CodroidSession":
@@ -1727,6 +1768,158 @@ class CodroidSession:
         merged = merge_coordinate_frame(current.coordinate, frame_id, coord_frame)
         validate_tool_frames_for_save(merged)
         return self._send_save_robot_parameter(build_coordinate_db(merged))
+
+    # --- 20. 力控接口 / Force Control ---
+
+    def FTSensorDriftCalibration(self, timeout_ms: int = 3000) -> CommonResponse:
+        """
+        六维力传感器零力校准/去皮（阻塞，约 2500ms）。
+
+        建议在每次进入力控前执行，以保证外力计算准确。
+
+        Args:
+            timeout_ms: 超时时间 (ms)，默认 3000。超时抛出 CodroidTimeoutError。
+
+        Returns:
+            CommonResponse: 响应对象。
+
+        Raises:
+            CodroidTimeoutError: 超时未响应。
+        """
+        import socket as _socket
+
+        old_timeout = None
+        sock = getattr(self._net, '_sock', None)
+        if sock is not None:
+            old_timeout = sock.gettimeout()
+            sock.settimeout(timeout_ms / 1000.0)
+
+        try:
+            return self._send_action_command("FTSensorDriftCalibration")
+        except _socket.timeout:
+            raise CodroidTimeoutError(
+                f"FTSensorDriftCalibration 超时 ({timeout_ms}ms)，请检查传感器连接。"
+            )
+        finally:
+            if sock is not None and old_timeout is not None:
+                try:
+                    sock.settimeout(old_timeout)
+                except Exception:
+                    pass
+
+    def InitForceControl(
+        self,
+        frame: int,
+        axis_mode: List[int],
+        compliance: Optional[Dict[str, Any]] = None,
+        constant_force: Optional[Dict[str, Any]] = None,
+        user_frame_rpy: Optional[List[float]] = None,
+        desired_wrench: Optional[List[float]] = None,
+        force_limit: Optional[Dict[str, Any]] = None,
+    ) -> CommonResponse:
+        """
+        进入力控前一次性配参（导纳算法/坐标系/S矩阵/原语/M·D·K，无斜坡）。
+
+        Args:
+            frame: 力控坐标系 (ForceFrame): 0=TCP, 1=用户系, 2=世界系。
+            axis_mode: 选择矩阵 S，逐轴 (ForceAxisMode): 0=位控, 1=力控, 2=柔顺。
+            compliance: 柔顺原语配置 (可选)。
+            constant_force: 恒力原语配置 (可选)。
+            user_frame_rpy: 用户系姿态 [rx,ry,rz] (deg)，frame=1 时生效 (可选)。
+            desired_wrench: 期望力简写 [Fx,Fy,Fz,Mx,My,Mz] (N/N·m)，仅当未给 constantForce 时生效 (可选)。
+            force_limit: 工艺级力限幅 (可选): {"wrenchLimit": float[6]}。
+
+        Returns:
+            CommonResponse: 响应对象。
+        """
+        if len(axis_mode) != 6:
+            raise CodroidError("axis_mode 必须为 6 元素列表 / axis_mode must be a 6-element list.")
+        db: Dict[str, Any] = {
+            "algo": 1,  # 固定导纳算法 (Admittance)
+            "frame": int(frame),
+            "axisMode": [int(x) for x in axis_mode],
+        }
+        if compliance is not None:
+            db["compliance"] = compliance
+        if constant_force is not None:
+            db["constantForce"] = constant_force
+        if user_frame_rpy is not None:
+            db["userFrameRpy"] = user_frame_rpy
+        if desired_wrench is not None:
+            db["desiredWrench"] = desired_wrench
+        if force_limit is not None:
+            db["forceLimit"] = force_limit
+        return self._send_action_command("initForceControl", db)
+
+    def StartForceControl(self) -> CommonResponse:
+        """
+        触发进入力控（参数须已由 InitForceControl 配好）。
+
+        Returns:
+            CommonResponse: 响应对象。
+        """
+        return self._send_action_command("startForceControl")
+
+    def StopForceControl(self, smooth_time_ms: int = 300) -> CommonResponse:
+        """
+        平滑退出力控。
+
+        Args:
+            smooth_time_ms: 平滑退出斜坡时长 (ms)，默认 300。
+
+        Returns:
+            CommonResponse: 响应对象。
+        """
+        return self._send_action_command("stopForceControl", {"smoothTimeMs": int(smooth_time_ms)})
+
+    def TuneForceParams(
+        self,
+        stiffness: Optional[List[float]] = None,
+        damping: Optional[List[float]] = None,
+        mass: Optional[List[float]] = None,
+        desired_force: Optional[List[float]] = None,
+        kp: Optional[List[float]] = None,
+        kd: Optional[List[float]] = None,
+    ) -> CommonResponse:
+        """
+        在线调参（运行中调整 M/D/K、期望力，经算法斜坡平滑生效）。
+
+        Args:
+            stiffness: 刚度 K [Kx..Krz] (N/m, N·m/rad) (可选)。
+            damping: 阻尼 D [Dx..Drz] (N·s/m, N·m·s/rad) (可选)。
+            mass: 质量 M [Mx..Mrz] (kg, kg·m²)，导纳须 >0 (可选)。
+            desired_force: 期望力 [Fx..Trz] (N/N·m)，恒力原语斜坡加载 (可选)。
+            kp: PD 力控 kp 增益 (可选，仅 PD 力控算法)。
+            kd: PD 力控 kd 增益 (可选，仅 PD 力控算法)。
+
+        Returns:
+            CommonResponse: 响应对象。
+        """
+        db: Dict[str, Any] = {}
+        if stiffness is not None:
+            db["stiffness"] = stiffness
+        if damping is not None:
+            db["damping"] = damping
+        if mass is not None:
+            db["mass"] = mass
+        if desired_force is not None:
+            db["desiredForce"] = desired_force
+        if kp is not None:
+            db["kp"] = kp
+        if kd is not None:
+            db["kd"] = kd
+        return self._send_action_command("tuneForceParams", db)
+
+    def GetForceState(self) -> "ForceControlState":
+        """
+        查询力控实时状态。
+
+        Returns:
+            ForceControlState: 力控状态快照。
+        """
+        from .define import ForceControlState
+        resp = self._send_action_command("getForceState")
+        return ForceControlState.from_db(resp.db)
 
     # 支持 with 语句
     def __enter__(self):

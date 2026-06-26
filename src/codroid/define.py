@@ -139,7 +139,77 @@ class RS485Parity(IntEnum):
     EVEN = 2
 
 # =============================================================================
-# 4. 运动控制模型 / Motion Control Models
+# 4. 力控模型 / Force Control Models
+# =============================================================================
+
+class ForceFrame(IntEnum):
+    """力控坐标系 / Force control coordinate frame."""
+
+    TCP = 0    # 工具系
+    USER = 1   # 用户系
+    WORLD = 2  # 世界系
+
+
+class ForceAxisMode(IntEnum):
+    """力控轴模式 / Force control axis mode."""
+
+    POSITION = 0   # 位控: 跟踪规划轨迹
+    FORCE = 1      # 力控: 跟踪期望力 F_des
+    COMPLIANT = 2  # 柔顺: 导纳/阻抗顺从
+
+
+class ForceHealth(IntEnum):
+    """力控数据健康状态 / Force control data health status."""
+
+    OK = 0          # 正常
+    INVALID = 1     # 数值无效 (NaN/Inf)
+    TIMEOUT = 2     # 超时
+    SATURATED = 3   # 饱和
+    PACKET_LOSS = 4 # 丢包超限
+
+
+@dataclass
+class ForceControlState:
+    """力控实时状态 / Force control real-time state (returned by GetForceState).
+
+    六维顺序: [X, Y, Z, RX, RY, RZ]
+    力/力矩: N / N·m
+    """
+
+    enabled: bool = False               # 已进入力控
+    pending: bool = False               # 已受理请求、尚未进入
+    algo: int = 0                       # 当前算法 (ForceControlAlgo)
+    valid: bool = False                 # 外力数据有效性
+    is_contact: bool = False            # 接触判据
+    is_overforce: bool = False          # 过力判据
+    health: int = 0                     # 数据健康状态 (ForceHealth)
+    wrench_tcp: List[float] = field(default_factory=lambda: [0.0] * 6)    # TCP 系外力 [Fx,Fy,Fz,Mx,My,Mz]
+    wrench_base: List[float] = field(default_factory=lambda: [0.0] * 6)   # 基座系外力
+    desired_wrench: List[float] = field(default_factory=lambda: [0.0] * 6) # 期望力 F_des
+    track_error: List[float] = field(default_factory=lambda: [0.0] * 6)   # 力跟踪误差
+    axis_mode: List[int] = field(default_factory=lambda: [0] * 6)         # 选择矩阵 S 快照
+
+    @classmethod
+    def from_db(cls, db: dict) -> 'ForceControlState':
+        """从协议响应 db 构造 / Construct from protocol response db."""
+        return cls(
+            enabled=db.get('enabled', False),
+            pending=db.get('pending', False),
+            algo=db.get('algo', 0),
+            valid=db.get('valid', False),
+            is_contact=db.get('isContact', False),
+            is_overforce=db.get('isOverforce', False),
+            health=db.get('health', 0),
+            wrench_tcp=db.get('wrenchTcp', [0.0] * 6),
+            wrench_base=db.get('wrenchBase', [0.0] * 6),
+            desired_wrench=db.get('desiredWrench', [0.0] * 6),
+            track_error=db.get('trackError', [0.0] * 6),
+            axis_mode=db.get('axisMode', [0] * 6),
+        )
+
+
+# =============================================================================
+# 5. 运动控制模型 / Motion Control Models
 # =============================================================================
 
 class MotionType(str, Enum):
