@@ -1771,7 +1771,7 @@ class CodroidSession:
 
     # --- 20. 力控接口 / Force Control ---
 
-    def FTSensorDriftCalibration(self, timeout_ms: int = 3000) -> CommonResponse:
+    def FTSensorDriftCalibration(self, timeout_ms: int = 5000) -> CommonResponse:
         """
         六维力传感器零力校准/去皮（阻塞，约 2500ms）。
 
@@ -1795,7 +1795,7 @@ class CodroidSession:
             sock.settimeout(timeout_ms / 1000.0)
 
         try:
-            return self._send_action_command("FTSensorDriftCalibration")
+            return self._send_command("Robot/FTSensorDriftCalibration", "")
         except _socket.timeout:
             raise CodroidTimeoutError(
                 f"FTSensorDriftCalibration 超时 ({timeout_ms}ms)，请检查传感器连接。"
@@ -1849,7 +1849,7 @@ class CodroidSession:
             db["desiredWrench"] = desired_wrench
         if force_limit is not None:
             db["forceLimit"] = force_limit
-        return self._send_action_command("initForceControl", db)
+        return self._send_command("Robot/initForceControl", db)
 
     def StartForceControl(self) -> CommonResponse:
         """
@@ -1858,7 +1858,7 @@ class CodroidSession:
         Returns:
             CommonResponse: 响应对象。
         """
-        return self._send_action_command("startForceControl")
+        return self._send_command("Robot/startForceControl", "")
 
     def StopForceControl(self, smooth_time_ms: int = 300) -> CommonResponse:
         """
@@ -1870,7 +1870,7 @@ class CodroidSession:
         Returns:
             CommonResponse: 响应对象。
         """
-        return self._send_action_command("stopForceControl", {"smoothTimeMs": int(smooth_time_ms)})
+        return self._send_command("Robot/stopForceControl", {"smoothTimeMs": int(smooth_time_ms)})
 
     def TuneForceParams(
         self,
@@ -1908,7 +1908,7 @@ class CodroidSession:
             db["kp"] = kp
         if kd is not None:
             db["kd"] = kd
-        return self._send_action_command("tuneForceParams", db)
+        return self._send_command("Robot/tuneForceParams", db)
 
     def GetForceState(self) -> "ForceControlState":
         """
@@ -1918,7 +1918,7 @@ class CodroidSession:
             ForceControlState: 力控状态快照。
         """
         from .define import ForceControlState
-        resp = self._send_action_command("getForceState")
+        resp = self._send_command("Robot/getForceState", "")
         return ForceControlState.from_db(resp.db)
 
     # 支持 with 语句

@@ -178,7 +178,7 @@ def demo_admittance_compliance(robot) -> None:
     # --- 第三步：运动 + 轮询状态 ---
     print("\n开始运动（Z 轴柔顺中，外力可推动）...")
     p1 = JointPoint.Degrees([0, 0, 90, 0, 90, 0])
-    p2 = JointPoint.Degrees([0, 0, 0, 0, 0, 0])
+    p2 = JointPoint.Degrees([20, 0, 90, 0, 90, 0])
 
     for i in range(3):
         print(f"\n--- 第 {i+1} 轮运动 ---")
