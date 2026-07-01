@@ -13,7 +13,15 @@
   - project/run、pause、resume、stop、runByIndex 等（见 PROTOCOL_LINE_BY_LINE.md）
 
 【运行】
-  PYTHONPATH=src python examples/03_run_project.py --robot <IP>
+  均在项目根目录 CodroidPython/ 执行。
+
+  临时启动（未安装 SDK，直接使用 src 源码）：
+    Linux / macOS:   PYTHONPATH=src python examples/03_run_project.py [参数...]
+    Windows PS:      $env:PYTHONPATH="src"; python examples/03_run_project.py [参数...]
+    Windows cmd:     set PYTHONPATH=src && python examples\03_run_project.py [参数...]
+
+  本地安装启动（pip install -e . 后）：
+    python examples/03_run_project.py --robot 192.168.8.136
 
 【注意】
   - 每步之间有 --step-sleep 间隔，便于观察示教器状态

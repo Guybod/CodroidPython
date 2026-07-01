@@ -13,7 +13,15 @@
   - TCP Robot/rs485Init、rs485Flush、rs485Write、rs485Read
 
 【运行】
-  PYTHONPATH=src python examples/05_rs485.py --robot <IP>
+  均在项目根目录 CodroidPython/ 执行。
+
+  临时启动（未安装 SDK，直接使用 src 源码）：
+    Linux / macOS:   PYTHONPATH=src python examples/05_rs485.py [参数...]
+    Windows PS:      $env:PYTHONPATH="src"; python examples/05_rs485.py [参数...]
+    Windows cmd:     set PYTHONPATH=src && python examples\05_rs485.py [参数...]
+
+  本地安装启动（pip install -e . 后）：
+    python examples/05_rs485.py --robot 192.168.8.136
 
 【注意】
   - timeout 单位为毫秒（示例 1000）

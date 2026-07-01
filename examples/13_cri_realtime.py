@@ -15,7 +15,15 @@
   - 解析后 joint_pos 等为 **mm + 度**（非线上 m/rad）
 
 【运行】
-  PYTHONPATH=src python examples/13_cri_realtime.py --robot <IP> --local-ip <IP>
+  均在项目根目录 CodroidPython/ 执行。
+
+  临时启动（未安装 SDK，直接使用 src 源码）：
+    Linux / macOS:   PYTHONPATH=src python examples/13_cri_realtime.py [参数...]
+    Windows PS:      $env:PYTHONPATH="src"; python examples/13_cri_realtime.py [参数...]
+    Windows cmd:     set PYTHONPATH=src && python examples\13_cri_realtime.py [参数...]
+
+  本地安装启动（pip install -e . 后）：
+    python examples/13_cri_realtime.py --robot 192.168.8.136 --local-ip 192.168.8.150
 
 【注意】
   - 示例直接访问 handler._sock，仅用于演示；生产环境可用公开 API 封装

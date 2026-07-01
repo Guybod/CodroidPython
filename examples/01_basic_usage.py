@@ -15,8 +15,16 @@
   - UDP：308 字节 CRI 推送（解析后为 mm + 度，见 AGENTS.md §2.3）
 
 【运行】
-  PYTHONPATH=src python examples/01_basic_usage.py
-  PYTHONPATH=src python examples/01_basic_usage.py --robot 192.168.8.136
+  均在项目根目录 CodroidPython/ 执行。
+
+  临时启动（未安装 SDK，直接使用 src 源码）：
+    Linux / macOS:   PYTHONPATH=src python examples/01_basic_usage.py [参数...]
+    Windows PS:      $env:PYTHONPATH="src"; python examples/01_basic_usage.py [参数...]
+    Windows cmd:     set PYTHONPATH=src && python examples\01_basic_usage.py [参数...]
+
+  本地安装启动（pip install -e . 后）：
+    python examples/01_basic_usage.py
+    python examples/01_basic_usage.py --robot 192.168.8.136
 
 【注意】
   - 会实际运动机器人，请在安全空间内运行

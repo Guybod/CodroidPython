@@ -12,7 +12,15 @@
   - IOManager/setDo、getDi、setAo、getAi、getIoValues（ty 见 PROTOCOL_LINE_BY_LINE.md）
 
 【运行】
-  PYTHONPATH=src python examples/11_io_demo.py --robot <IP>
+  均在项目根目录 CodroidPython/ 执行。
+
+  临时启动（未安装 SDK，直接使用 src 源码）：
+    Linux / macOS:   PYTHONPATH=src python examples/11_io_demo.py [参数...]
+    Windows PS:      $env:PYTHONPATH="src"; python examples/11_io_demo.py [参数...]
+    Windows cmd:     set PYTHONPATH=src && python examples\11_io_demo.py [参数...]
+
+  本地安装启动（pip install -e . 后）：
+    python examples/11_io_demo.py --robot 192.168.8.136
 
 【注意】
   - set_do(10, 1) 会改变输出，确认端口未驱动关键安全设备

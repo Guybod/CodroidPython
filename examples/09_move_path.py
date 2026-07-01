@@ -13,7 +13,15 @@
   - Robot/move：指令数组；movL 段可设 blend 过渡半径
 
 【运行】
-  PYTHONPATH=src python examples/09_move_path.py --robot <IP>
+  均在项目根目录 CodroidPython/ 执行。
+
+  临时启动（未安装 SDK，直接使用 src 源码）：
+    Linux / macOS:   PYTHONPATH=src python examples/09_move_path.py [参数...]
+    Windows PS:      $env:PYTHONPATH="src"; python examples/09_move_path.py [参数...]
+    Windows cmd:     set PYTHONPATH=src && python examples\09_move_path.py [参数...]
+
+  本地安装启动（pip install -e . 后）：
+    python examples/09_move_path.py --robot 192.168.8.136
 
 【注意】
   - blend>0 时相邻段在拐角处平滑，末段 blend=0 表示精确停到点

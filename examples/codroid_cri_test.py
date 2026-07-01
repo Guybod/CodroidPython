@@ -18,8 +18,16 @@ CRI 实时控制联调 — 对齐 C# ``CodroidCRITest``（AGENTS.md §5.2 / §6�
   7. finally：StopCriControl、StopCriDataPush
 
 【运行】
-  PYTHONPATH=src python examples/codroid_cri_test.py --mode joint
-  PYTHONPATH=src python examples/codroid_cri_test.py --robot 192.168.8.136
+  均在项目根目录 CodroidPython/ 执行。
+
+  临时启动（未安装 SDK，直接使用 src 源码）：
+    Linux / macOS:   PYTHONPATH=src python examples/codroid_cri_test.py [参数...]
+    Windows PS:      $env:PYTHONPATH="src"; python examples/codroid_cri_test.py [参数...]
+    Windows cmd:     set PYTHONPATH=src && python examples\codroid_cri_test.py [参数...]
+
+  本地安装启动（pip install -e . 后）：
+    python examples/codroid_cri_test.py --mode joint
+    python examples/codroid_cri_test.py --robot 192.168.8.136
 
 【注意】
   - 每段前有 3 秒倒计时，Ctrl+C 仍会走 finally 停控

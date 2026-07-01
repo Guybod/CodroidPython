@@ -13,7 +13,15 @@
   - TCP globalVar/save：每个变量含 val（JSON 字符串）与可选 nm（备注）
 
 【运行】
-  PYTHONPATH=src python examples/04_global_value.py --robot <IP>
+  均在项目根目录 CodroidPython/ 执行。
+
+  临时启动（未安装 SDK，直接使用 src 源码）：
+    Linux / macOS:   PYTHONPATH=src python examples/04_global_value.py [参数...]
+    Windows PS:      $env:PYTHONPATH="src"; python examples/04_global_value.py [参数...]
+    Windows cmd:     set PYTHONPATH=src && python examples\04_global_value.py [参数...]
+
+  本地安装启动（pip install -e . 后）：
+    python examples/04_global_value.py --robot 192.168.8.136
 
 【注意】
   - save_global_vars 为增量保存，不会删除未出现在字典中的其它全局变量

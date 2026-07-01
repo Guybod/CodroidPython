@@ -17,7 +17,15 @@
   - StopMoveTo：发送 type=-1 停止 MoveTo
 
 【运行】
-  PYTHONPATH=src python examples/07_move_to.py --robot <IP>
+  均在项目根目录 CodroidPython/ 执行。
+
+  临时启动（未安装 SDK，直接使用 src 源码）：
+    Linux / macOS:   PYTHONPATH=src python examples/07_move_to.py [参数...]
+    Windows PS:      $env:PYTHONPATH="src"; python examples/07_move_to.py [参数...]
+    Windows cmd:     set PYTHONPATH=src && python examples\07_move_to.py [参数...]
+
+  本地安装启动（pip install -e . 后）：
+    python examples/07_move_to.py --robot 192.168.8.136
 
 【注意】
   - 目标请用 ``MoveToTarget.Joint`` / ``MoveToTarget.Cartesian``，勿裸填数组

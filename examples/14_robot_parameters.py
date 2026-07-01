@@ -20,8 +20,16 @@
   - 本示例**不**调用 ``SetCollisionSensitivity`` / ``SetPayload``，避免改变碰撞灵敏度与当前负载编号
 
 【运行】
-  PYTHONPATH=src python examples/14_robot_parameters.py --robot <IP>
-  PYTHONPATH=src python examples/14_robot_parameters.py --robot <IP> --no-restore
+  均在项目根目录 CodroidPython/ 执行。
+
+  临时启动（未安装 SDK，直接使用 src 源码）：
+    Linux / macOS:   PYTHONPATH=src python examples/14_robot_parameters.py [参数...]
+    Windows PS:      $env:PYTHONPATH="src"; python examples/14_robot_parameters.py [参数...]
+    Windows cmd:     set PYTHONPATH=src && python examples\14_robot_parameters.py [参数...]
+
+  本地安装启动（pip install -e . 后）：
+    python examples/14_robot_parameters.py --robot 192.168.8.136
+    python examples/14_robot_parameters.py --robot 192.168.8.136 --no-restore
 
 【注意】
   - ``SetPayload``（``Robot/setPayload``）与 ``SetPayloadFrame``（负载表）不同，勿混淆

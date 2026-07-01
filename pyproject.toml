@@ -42,6 +42,14 @@ Source = "https://github.com/Guybod/CodroidPython"
 [tool.hatch.version]
 path = "src/codroid/__about__.py"
 
+[tool.hatch.envs.default]
+extra-dependencies = [
+  "colorama>=0.4.6",
+]
+
+[tool.hatch.envs.default.env-vars]
+PYTHONUTF8 = "1"
+
 [tool.hatch.envs.types]
 extra-dependencies = [
   "mypy>=1.0.0",

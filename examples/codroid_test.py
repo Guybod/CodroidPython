@@ -14,9 +14,17 @@
   robotparam  机器人设置 19.x（GetRobotParameters / SetToolFrame，见 14_robot_parameters.py）
 
 【运行】
-  PYTHONPATH=src python examples/codroid_test.py              # 等同 all，依次全跑
-  PYTHONPATH=src python examples/codroid_test.py motion
-  PYTHONPATH=src python examples/codroid_test.py s20 --robot 192.168.8.136
+  均在项目根目录 CodroidPython/ 执行。
+
+  临时启动（未安装 SDK，直接使用 src 源码）：
+    Linux / macOS:   PYTHONPATH=src python examples/codroid_test.py [参数...]
+    Windows PS:      $env:PYTHONPATH="src"; python examples/codroid_test.py [参数...]
+    Windows cmd:     set PYTHONPATH=src && python examples\codroid_test.py [参数...]
+
+  本地安装启动（pip install -e . 后）：
+    python examples/codroid_test.py              # 等同 all，依次全跑
+    python examples/codroid_test.py motion
+    python examples/codroid_test.py s20 --robot 192.168.8.136
 
 【注意】
   - ``all`` 会运动机器人且耗时 long，建议分项调试

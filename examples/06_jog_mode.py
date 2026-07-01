@@ -13,7 +13,15 @@
   - Robot/setManualMoveRate、Robot/jog、Robot/jogHeartbeat、Robot/stopJog
 
 【运行】
-  PYTHONPATH=src python examples/06_jog_mode.py --robot <IP>
+  均在项目根目录 CodroidPython/ 执行。
+
+  临时启动（未安装 SDK，直接使用 src 源码）：
+    Linux / macOS:   PYTHONPATH=src python examples/06_jog_mode.py [参数...]
+    Windows PS:      $env:PYTHONPATH="src"; python examples/06_jog_mode.py [参数...]
+    Windows cmd:     set PYTHONPATH=src && python examples\06_jog_mode.py [参数...]
+
+  本地安装启动（pip install -e . 后）：
+    python examples/06_jog_mode.py --robot 192.168.8.136
 
 【注意】
   - speed 为 -1.0~1.0 的比例，负值表示反向

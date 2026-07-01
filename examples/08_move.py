@@ -21,7 +21,15 @@
   - S20 等机型请核对笛卡尔点位（常量来自 AGENTS.md §5.1）
 
 【运行】
-  PYTHONPATH=src python examples/08_move.py --robot <IP> --local-ip <本机IP>
+  均在项目根目录 CodroidPython/ 执行。
+
+  临时启动（未安装 SDK，直接使用 src 源码）：
+    Linux / macOS:   PYTHONPATH=src python examples/08_move.py [参数...]
+    Windows PS:      $env:PYTHONPATH="src"; python examples/08_move.py [参数...]
+    Windows cmd:     set PYTHONPATH=src && python examples\08_move.py [参数...]
+
+  本地安装启动（pip install -e . 后）：
+    python examples/08_move.py --robot 192.168.8.136 --local-ip 192.168.8.150
 
 【注意】
   - ``MovJ(CartesianPoint)``：关节插补到 TCP，控制器逆解；有 CRI 时用当前关节作 ``rj``

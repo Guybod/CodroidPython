@@ -18,10 +18,18 @@
          tuneForceParams, getForceState
 
 【运行】
-  PYTHONPATH=src python examples/16_force_control.py
-  PYTHONPATH=src python examples/16_force_control.py --robot 192.168.1.136
-  PYTHONPATH=src python examples/16_force_control.py --demo compliance
-  PYTHONPATH=src python examples/16_force_control.py --demo constant_force
+  均在项目根目录 CodroidPython/ 执行。
+
+  临时启动（未安装 SDK，直接使用 src 源码）：
+    Linux / macOS:   PYTHONPATH=src python examples/16_force_control.py [参数...]
+    Windows PS:      $env:PYTHONPATH="src"; python examples/16_force_control.py [参数...]
+    Windows cmd:     set PYTHONPATH=src && python examples\16_force_control.py [参数...]
+
+  本地安装启动（pip install -e . 后）：
+    python examples/16_force_control.py
+    python examples/16_force_control.py --robot 192.168.1.136
+    python examples/16_force_control.py --demo compliance
+    python examples/16_force_control.py --demo constant_force
 
 【注意】
   - 力控进入前须确保 TCP 速度 ≈ 0（>1e-3 m/s 会被拒绝）
@@ -203,7 +211,7 @@ def demo_admittance_compliance(robot) -> None:
 def demo_admittance_constant_force(robot) -> None:
     """
     导纳恒力跟踪演示：
-    - Z 方向保持 -20N 向下压力
+    - Z 方向保持 -2N 向下压力
     - 运行中通过 tuneForceParams 在线调整期望力
     - 展示斜坡平滑加载效果
     """
@@ -214,12 +222,12 @@ def demo_admittance_constant_force(robot) -> None:
     # 纯力跟踪参数说明：
     #   - stiffness = 0 → 纯力跟踪（无弹性回复）
     #   - damping / mass → 决定跟踪柔度和响应速度
-    #   - desired_force Z = -20N → 向下压 20 牛顿
+    #   - desired_force Z = -2N → 向下压 2 牛顿
     #   - ramp_time_ms = 500 → 期望力 500ms 斜坡加载，避免冲击
     stiffness     = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]    # N/m（纯力跟踪取 0）
     damping       = [0.0, 0.0, 25.0, 0.0, 0.0, 0.0]   # N·s/m
     mass          = [0.5, 0.5, 0.5, 0.02, 0.02, 0.02]  # kg
-    desired_force = [0.0, 0.0, -20.0, 0.0, 0.0, 0.0]   # N（Z 向下 20N）
+    desired_force = [0.0, 0.0, -2.0, 0.0, 0.0, 0.0]    # N（Z 向下 2N）
     force_enable  = [False, False, True, False, False, False]
 
     constant_force = make_constant_force(
@@ -242,7 +250,7 @@ def demo_admittance_constant_force(robot) -> None:
         axis_mode=axis_mode,
         constant_force=constant_force,
     )
-    print("✓ 配参完成（导纳 + TCP 系 + Z 恒力 -20N）")
+    print("✓ 配参完成（导纳 + TCP 系 + Z 恒力 -2N）")
 
     # --- 第二步：进入力控 ---
     robot.StartForceControl()
