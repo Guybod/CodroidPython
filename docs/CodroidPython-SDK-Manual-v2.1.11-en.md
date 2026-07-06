@@ -756,14 +756,24 @@ class MotionWaitOptions:
     poll_interval: float = 0.05                        # Poll interval (seconds)
     cri_stale_timeout: float = 0.5                     # CRI data stale threshold (seconds)
     settled_samples: int = 3                           # Consecutive settled sample count
+    use_tolerance: bool = False                        # Enable tolerance pre-check
+    joint_tolerance_deg: float = 0.5                   # Joint tolerance (degrees)
+    cartesian_position_tolerance_mm: float = 1.0       # Position tolerance (mm)
+    cartesian_orientation_tolerance_deg: float = 1.0   # Orientation tolerance (degrees)
+    motion_start_timeout: float = 1.0                  # Wait for InMotion to start (seconds)
 ```
 
 ```python
 from codroid import MotionWaitOptions
 
+# Default options
 opts = MotionWaitOptions(timeout=30.0)
 robot.MovJSync(JointPoint.Degrees([0, 0, 90, 0, 90, 0]),
                speed=40, acceleration=100, wait=opts)
+
+# Enable tolerance pre-check (returns immediately if target is within tolerance)
+opts = MotionWaitOptions(use_tolerance=True, joint_tolerance_deg=0.5)
+robot.MovJSync(target, speed=50, acceleration=500, wait=opts)
 ```
 
 ---

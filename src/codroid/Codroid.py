@@ -1031,16 +1031,33 @@ class CodroidSession:
         self,
         op_name: str,
         options: "MotionWaitOptions",
+        instructions: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
-        """轮询 CRI 数据直到机器人停稳 / Poll CRI until robot settles (v2.1.8: only check InMotion)."""
+        """轮询 CRI 数据直到机器人停稳 / Poll CRI until robot settles.
+
+        Args:
+            op_name: 操作名称（用于错误信息）。
+            options: 等待参数。
+            instructions: 运动指令列表（仅 use_tolerance=True 时需要，用于容差前置判断）。
+        """
         if options.settled_samples <= 0:
             raise CodroidError("MotionWaitOptions.settled_samples must be > 0.")
         if options.poll_interval <= 0:
             raise CodroidError("MotionWaitOptions.poll_interval must be > 0.")
 
+        # 容差前置判断：如果目标已在容差范围内，直接返回
+        if options.use_tolerance and instructions:
+            self._ensure_cri_fresh(options, op_name)
+            snapshot = self.CriData
+            if snapshot is not None:
+                predicate = self._build_move_target_reached_predicate(instructions, options)
+                if predicate(snapshot):
+                    return  # 目标已在容差内，短路返回
+
         start = time.monotonic()
         settled = 0
         had_motion = False
+        motion_started = False
 
         while (time.monotonic() - start) <= options.timeout:
             self._ensure_cri_fresh(options, op_name)
@@ -1051,6 +1068,7 @@ class CodroidSession:
 
             if snapshot.status.is_moving:
                 had_motion = True
+                motion_started = True
 
             if snapshot.status.collision_stop or snapshot.status.is_emergency_stop or snapshot.status.has_alarm:
                 raise CodroidError(
@@ -1059,6 +1077,17 @@ class CodroidSession:
                     f"EmergencyStopPressed={snapshot.status.is_emergency_stop}, "
                     f"HasAlarm={snapshot.status.has_alarm})."
                 )
+
+            # 启动超时检测：如果 InMotion 在 motion_start_timeout 内从未变为 true，直接报错
+            if not motion_started:
+                elapsed = time.monotonic() - start
+                if elapsed >= options.motion_start_timeout:
+                    jp_str = ", ".join(f"{v:.3f}" for v in (snapshot.joint_position if snapshot else []))
+                    raise CodroidError(
+                        f"{op_name} failed: robot never started moving (InMotion never True within {options.motion_start_timeout:.1f}s). "
+                        f"Target may be unreachable or controller not responding. "
+                        f"Last state: jp=[{jp_str}]"
+                    )
 
             still = not snapshot.status.is_moving
             if had_motion and still:
@@ -1070,6 +1099,7 @@ class CodroidSession:
 
             time.sleep(options.poll_interval)
 
+        # 整体超时
         tail = self.CriData
         jp_str = ", ".join(f"{v:.3f}" for v in (tail.joint_position if tail else []))
         raise CodroidTimeoutError(
@@ -1125,9 +1155,24 @@ class CodroidSession:
             bool: 到达目标返回 True。
         """
         options = wait or MotionWaitOptions()
-        self.MovJ(target, speed, acceleration, blend=blend, relative_blend=relative_blend, coor=coor, tool=tool)
-        self._wait_until_settled_by_cri("MovJSync", options)
+        resp = self.MovJ(target, speed, acceleration, blend=blend, relative_blend=relative_blend, coor=coor, tool=tool)
+        # 构造指令用于容差判断
+        instructions = self._build_instructions_for_tolerance(target)
+        self._wait_until_settled_by_cri("MovJSync", options, instructions=instructions)
         return True
+
+    def _build_instructions_for_tolerance(self, target) -> List[Dict[str, Any]]:
+        """根据目标类型构造指令列表（用于容差前置判断）。"""
+        from .robot_motion import pack_move_point
+        if isinstance(target, JointPoint):
+            mp = MovePoint.FromJoint(target)
+        elif isinstance(target, CartesianPoint):
+            mp = MovePoint.FromCartesian(target)
+        elif isinstance(target, MovePoint):
+            mp = target
+        else:
+            return []
+        return [{"targetPoint": pack_move_point(mp)}]
 
     def MovLSync(
         self,
@@ -1157,7 +1202,8 @@ class CodroidSession:
         """
         options = wait or MotionWaitOptions()
         self.MovL(target, speed, acceleration, blend=blend, relative_blend=relative_blend, coor=coor, tool=tool)
-        self._wait_until_settled_by_cri("MovLSync", options)
+        instructions = self._build_instructions_for_tolerance(target)
+        self._wait_until_settled_by_cri("MovLSync", options, instructions=instructions)
         return True
 
     def MovCSync(
@@ -1179,7 +1225,8 @@ class CodroidSession:
         """
         options = wait or MotionWaitOptions()
         self.MovC(middle, target, speed, acceleration, blend=blend, relative_blend=relative_blend, coor=coor, tool=tool)
-        self._wait_until_settled_by_cri("MovCSync", options)
+        instructions = self._build_instructions_for_tolerance(target)
+        self._wait_until_settled_by_cri("MovCSync", options, instructions=instructions)
         return True
 
     def MovCircleSync(
@@ -1202,7 +1249,8 @@ class CodroidSession:
         """
         options = wait or MotionWaitOptions()
         self.MovCircle(middle, target, circle_num, speed, acceleration, blend=blend, relative_blend=relative_blend, coor=coor, tool=tool)
-        self._wait_until_settled_by_cri("MovCircleSync", options)
+        instructions = self._build_instructions_for_tolerance(target)
+        self._wait_until_settled_by_cri("MovCircleSync", options, instructions=instructions)
         return True
 
     # --- 12. 机器人控制命令 / Robot Control Commands ---

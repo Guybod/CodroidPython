@@ -322,3 +322,54 @@ with CodroidClient(host="192.168.8.136") as robot:
 ### coor / tool
 
 可选的用户坐标系和工具坐标系，格式为 `[x, y, z, a, b, c]`（mm + 度）。
+
+---
+
+## MotionWaitOptions（阻塞运动等待参数）
+
+```python
+@dataclass
+class MotionWaitOptions:
+    timeout: float = 60.0
+    poll_interval: float = 0.05
+    cri_stale_timeout: float = 0.5
+    settled_samples: int = 3
+    use_tolerance: bool = False
+    joint_tolerance_deg: float = 0.5
+    cartesian_position_tolerance_mm: float = 1.0
+    cartesian_orientation_tolerance_deg: float = 1.0
+```
+
+用于 `MoveSync` / `MovJSync` / `MovLSync` / `MovCSync` / `MovCircleSync` 控制 CRI 轮询行为。
+
+| 字段 | 类型 | 默认 | 说明 |
+|------|------|------|------|
+| `timeout` | `float` | `60.0` | 整体等待超时（秒） |
+| `poll_interval` | `float` | `0.05` | 轮询间隔（秒） |
+| `cri_stale_timeout` | `float` | `0.5` | CRI 数据过期判定（秒） |
+| `settled_samples` | `int` | `3` | `InMotion=False` 连续稳定采样数 |
+| `use_tolerance` | `bool` | `False` | 是否启用容差前置判断 |
+| `joint_tolerance_deg` | `float` | `0.5` | 关节容差（度） |
+| `cartesian_position_tolerance_mm` | `float` | `1.0` | 笛卡尔位置容差（mm） |
+| `cartesian_orientation_tolerance_deg` | `float` | `1.0` | 姿态容差（度） |
+| `motion_start_timeout` | `float` | `1.0` | 等待 InMotion 变为 true 的超时（秒） |
+
+### 容差前置判断
+
+当 `use_tolerance=True` 时：
+1. 收到目标后，先比较当前位置和目标位置
+2. 如果误差在容差范围内，直接返回 `true`，不等待 `InMotion`
+3. 如果超出容差，才走 `InMotion` 轮询逻辑
+4. 如果整个超时期间 `InMotion` 从未变为 `true`，抛出 `CodroidError`
+
+适用场景：目标和当前位置非常接近（如微调），避免因机器人不运动而超时。
+
+```python
+# 启用容差前置判断
+opts = MotionWaitOptions(
+    use_tolerance=True,
+    joint_tolerance_deg=0.5,
+    cartesian_position_tolerance_mm=1.0,
+)
+robot.MovJSync(target, speed=50, acc=500, wait=opts)
+```

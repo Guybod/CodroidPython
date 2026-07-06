@@ -377,13 +377,23 @@ class MotionWaitOptions:
     poll_interval: float = 0.05                     # 轮询间隔（秒）
     cri_stale_timeout: float = 0.5                  # CRI 数据过期判定（秒）
     settled_samples: int = 3                        # 连续稳定采样数
+    use_tolerance: bool = False                     # 是否启用容差前置判断
+    joint_tolerance_deg: float = 0.5                # 关节容差（度）
+    cartesian_position_tolerance_mm: float = 1.0    # 位置容差（mm）
+    cartesian_orientation_tolerance_deg: float = 1.0 # 姿态容差（度）
+    motion_start_timeout: float = 1.0                # 等待 InMotion 启动超时（秒）
 ```
 
 ```python
 from codroid import MotionWaitOptions
 
+# 默认参数
 robot.MovJSync(JointPoint.Degrees([0, 0, 90, 0, 90, 0]),
                speed=40, acceleration=100, wait=opts)
+
+# 启用容差前置判断（目标接近当前位置时直接返回，不等 InMotion）
+opts = MotionWaitOptions(use_tolerance=True, joint_tolerance_deg=0.5)
+robot.MovJSync(target, speed=50, acceleration=500, wait=opts)
 ```
 
 ---

@@ -746,7 +746,7 @@ robot.Move(path)
 
 `*Sync` 方法发送运动指令后自动轮询 CRI 数据，直到机器人停稳。需要先启动 CRI 数据推送。
 
-> **2.1.10 行为变更**：完成判定仅依据 CRI `InMotion` 标志（曾经运动 + 连续 `settled_samples` 次停稳），**不再**比对关节角或 TCP 与目标点误差。`MotionWaitOptions` 的容差字段已废弃，不再生效。
+> **容差前置判断**：当 `use_tolerance=True` 时，先比对当前位置和目标位置，误差在容差范围内直接返回，不等待 `InMotion`。适用场景：目标和当前位置非常接近（如微调），避免因机器人不运动而超时。
 
 #### MovJSync
 
@@ -918,14 +918,24 @@ class MotionWaitOptions:
     poll_interval: float = 0.05                     # 轮询间隔（秒）
     cri_stale_timeout: float = 0.5                  # CRI 数据过期判定（秒）
     settled_samples: int = 3                        # 连续稳定采样数
+    use_tolerance: bool = False                     # 是否启用容差前置判断
+    joint_tolerance_deg: float = 0.5                # 关节容差（度）
+    cartesian_position_tolerance_mm: float = 1.0    # 位置容差（mm）
+    cartesian_orientation_tolerance_deg: float = 1.0 # 姿态容差（度）
+    motion_start_timeout: float = 1.0                # 等待 InMotion 启动超时（秒）
 ```
 
 ```python
 from codroid import MotionWaitOptions
 
+# 默认参数
 opts = MotionWaitOptions(timeout=30.0)
 robot.MovJSync(JointPoint.Degrees([0, 0, 90, 0, 90, 0]),
                speed=40, acceleration=100, wait=opts)
+
+# 启用容差前置判断（目标接近当前位置时直接返回，不等 InMotion）
+opts = MotionWaitOptions(use_tolerance=True, joint_tolerance_deg=0.5)
+robot.MovJSync(target, speed=50, acceleration=500, wait=opts)
 ```
 
 ---

@@ -127,11 +127,24 @@ def main(argv: list[str]) -> int:
             PrintBanner("[6] 自定义 MotionWaitOptions")
             opts = MotionWaitOptions(
                 timeout=30.0,           # 30 秒超时
-                joint_tolerance_deg=0.5, # 关节容差放宽到 0.5 度
                 settled_samples=2,       # 连续 2 次稳定即可
             )
             robot.MovJSync(joint_pose, speed=40, acceleration=100, wait=opts)
-            print("  ✓ 到达目标（自定义容差）\n")
+            print("  ✓ 到达目标（自定义超时）\n")
+
+            # -----------------------------------------------------------------
+            # 7. 启用容差前置判断
+            # -----------------------------------------------------------------
+            PrintBanner("[7] 启用容差前置判断")
+            opts_tol = MotionWaitOptions(
+                use_tolerance=True,                    # 启用容差前置判断
+                joint_tolerance_deg=0.5,               # 关节容差 0.5 度
+                cartesian_position_tolerance_mm=1.0,   # 位置容差 1mm
+                cartesian_orientation_tolerance_deg=1.0, # 姿态容差 1 度
+            )
+            # 目标和当前位置接近时，直接返回 true，不等 InMotion
+            robot.MovJSync(joint_pose, speed=40, acceleration=100, wait=opts_tol)
+            print("  ✓ 到达目标（容差前置判断）\n")
 
             # 回 Home
             robot.MovJSync(joint_home, speed=40, acceleration=100)

@@ -514,18 +514,26 @@ class MotionWaitOptions:
     用于 ``MoveSync`` / ``MovJSync`` / ``MovLSync`` / ``MovCSync`` / ``MovCircleSync``
     控制 CRI 轮询行为。
 
-    v2.1.8：完成判定仅依据 CRI ``InMotion`` 标志，已移除容差字段。
-
     Attributes:
         timeout: 整体等待超时（秒），默认 60。
         poll_interval: 轮询间隔（秒），默认 0.05。
         cri_stale_timeout: CRI 数据过期判定（秒），默认 0.5。
         settled_samples: ``InMotion=False`` 连续稳定采样数，默认 3。
+        use_tolerance: 是否启用容差前置判断，默认 False。
+        joint_tolerance_deg: 关节容差（度），默认 0.5。
+        cartesian_position_tolerance_mm: 笛卡尔位置容差（mm），默认 1.0。
+        cartesian_orientation_tolerance_deg: 姿态容差（度），默认 1.0。
+        motion_start_timeout: 等待 InMotion 变为 true 的超时（秒），默认 5。超时未启动则报错。
     """
     timeout: float = 60.0
     poll_interval: float = 0.05
     cri_stale_timeout: float = 0.5
     settled_samples: int = 3
+    use_tolerance: bool = False
+    joint_tolerance_deg: float = 0.5
+    cartesian_position_tolerance_mm: float = 1.0
+    cartesian_orientation_tolerance_deg: float = 1.0
+    motion_start_timeout: float = 1.0
 
 
 # =============================================================================
