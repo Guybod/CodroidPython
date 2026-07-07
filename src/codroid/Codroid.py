@@ -1908,12 +1908,12 @@ class CodroidSession:
         """
         return self._send_command("Robot/startForceControl", "")
 
-    def StopForceControl(self, smooth_time_ms: int = 300) -> CommonResponse:
+    def StopForceControl(self, smooth_time_ms: int = 500) -> CommonResponse:
         """
         平滑退出力控。
 
         Args:
-            smooth_time_ms: 平滑退出斜坡时长 (ms)，默认 300。
+            smooth_time_ms: 平滑退出斜坡时长 (ms)，默认 500。
 
         Returns:
             CommonResponse: 响应对象。

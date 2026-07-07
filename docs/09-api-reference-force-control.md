@@ -164,7 +164,6 @@ def InitForceControl(
 
 | 字段 | 类型 | 默认 | 说明 |
 |------|------|------|------|
-| `axisEnable` | `bool[6]` | — | 柔顺方向使能 |
 | `stiffness` | `float[6]` | 见配置 | 柔顺方向刚度 K (N/m, N·m/rad) |
 | `damping` | `float[6]` | 见配置 | 柔顺方向阻尼 D (N·s/m, N·m·s/rad) |
 | `mass` | `float[6]` | 见配置 | 柔顺方向质量 M (kg, kg·m²)，导纳须 >0 |
@@ -174,7 +173,6 @@ def InitForceControl(
 
 | 字段 | 类型 | 默认 | 说明 |
 |------|------|------|------|
-| `axisEnable` | `bool[6]` | — | 恒力方向使能 |
 | `desiredForce` | `float[6]` | `0` | 各方向期望力/力矩 (N/N·m) |
 | `stiffness` | `float[6]` | 见配置 | 力控方向刚度 K（纯力跟踪取 0） |
 | `damping` | `float[6]` | 见配置 | 力控方向阻尼 D |
@@ -192,7 +190,7 @@ from codroid import CodroidSession, ForceFrame, ForceAxisMode
 session = CodroidSession("192.168.1.136", 9001)
 session.Connect()
 
-# Z 向 20N 恒力，XY 柔顺
+# Z 向 2N 恒力，XY 柔顺
 session.InitForceControl(
     frame=ForceFrame.TCP,
     axis_mode=[
@@ -204,16 +202,15 @@ session.InitForceControl(
         ForceAxisMode.POSITION,   # RZ: 位控
     ],
     constant_force={
-        "axisEnable": [False, False, True, False, False, False],
-        "desiredForce": [0, 0, -20, 0, 0, 0],
+        "desiredForce": [0, 0, 2, 0, 0, 0],
         "stiffness": [0, 0, 0, 0, 0, 0],
-        "damping": [0, 0, 25, 0, 0, 0],
-        "mass": [0.5, 0.5, 0.5, 0.02, 0.02, 0.02],
+        "damping": [250, 250, 250, 7.5, 7.5, 7.5],
+        "mass": [2.5, 2.5, 2.5, 0.15, 0.15, 0.15],
     },
     compliance={
-        "axisEnable": [True, True, False, False, False, False],
-        "stiffness": [200, 200, 0, 0, 0, 0],
-        "damping": [10, 10, 0, 0, 0, 0],
+        "stiffness": [800, 800, 800, 50, 50, 50],
+        "damping": [250, 250, 250, 7.5, 7.5, 7.5],
+        "mass": [2.5, 2.5, 2.5, 0.15, 0.15, 0.15],
     },
 )
 ```
@@ -370,32 +367,31 @@ StopForceControl          // 平滑退出
 
 ## 典型场景
 
-### 场景一：导纳柔顺（Z 轴柔顺，其余位控）
+### 场景一：导纳柔顺（全轴柔顺）
 
 ```python
-# 配参：Z 轴柔顺，低刚度易顺从
+# 配参：全轴柔顺，适中刚度
 session.InitForceControl(
     frame=ForceFrame.TCP,
     axis_mode=[
-        ForceAxisMode.POSITION,  # X: 位控
-        ForceAxisMode.POSITION,  # Y: 位控
-        ForceAxisMode.COMPLIANT, # Z: 柔顺
-        ForceAxisMode.POSITION,  # RX: 位控
-        ForceAxisMode.POSITION,  # RY: 位控
-        ForceAxisMode.POSITION,  # RZ: 位控
+        ForceAxisMode.COMPLIANT,  # X: 柔顺
+        ForceAxisMode.COMPLIANT,  # Y: 柔顺
+        ForceAxisMode.COMPLIANT,  # Z: 柔顺
+        ForceAxisMode.COMPLIANT,  # RX: 柔顺
+        ForceAxisMode.COMPLIANT,  # RY: 柔顺
+        ForceAxisMode.COMPLIANT,  # RZ: 柔顺
     ],
     compliance={
-        "axisEnable": [False, False, True, False, False, False],
-        "stiffness": [0, 0, 500, 0, 0, 0],
-        "damping": [0, 0, 25, 0, 0, 0],
-        "mass": [0.5, 0.5, 0.5, 0.02, 0.02, 0.02],
+        "stiffness": [800, 800, 800, 50, 50, 50],
+        "damping": [250, 250, 250, 7.5, 7.5, 7.5],
+        "mass": [2.5, 2.5, 2.5, 0.15, 0.15, 0.15],
     },
 )
 
 session.StartForceControl()
 time.sleep(2)
 
-# 运动过程中 Z 轴柔顺，外力可推动
+# 运动过程中全轴柔顺，外力可推动
 session.MovJ(JointPoint.Degrees([0, 0, 90, 0, 90, 0]), 30, 100)
 
 session.StopForceControl(smooth_time_ms=500)
@@ -404,7 +400,7 @@ session.StopForceControl(smooth_time_ms=500)
 ### 场景二：导纳恒力跟踪（Z 方向恒定压力）
 
 ```python
-# 配参：Z 方向 -20N 恒力，纯力跟踪 K=0
+# 配参：Z 方向 2N 恒力，纯力跟踪 K=0
 session.InitForceControl(
     frame=ForceFrame.TCP,
     axis_mode=[
@@ -416,11 +412,10 @@ session.InitForceControl(
         ForceAxisMode.POSITION, # RZ: 位控
     ],
     constant_force={
-        "axisEnable": [False, False, True, False, False, False],
-        "desiredForce": [0, 0, -20, 0, 0, 0],
+        "desiredForce": [0, 0, 2, 0, 0, 0],
         "stiffness": [0, 0, 0, 0, 0, 0],
-        "damping": [0, 0, 25, 0, 0, 0],
-        "mass": [0.5, 0.5, 0.5, 0.02, 0.02, 0.02],
+        "damping": [250, 250, 250, 7.5, 7.5, 7.5],
+        "mass": [2.5, 2.5, 2.5, 0.15, 0.15, 0.15],
         "rampTimeMs": 500,
     },
 )
@@ -428,8 +423,8 @@ session.InitForceControl(
 session.StartForceControl()
 time.sleep(2)
 
-# 在线提升目标压力到 30N
-session.TuneForceParams(desired_force=[0, 0, -30, 0, 0, 0])
+# 在线提升目标压力到 5N
+session.TuneForceParams(desired_force=[0, 0, 5, 0, 0, 0])
 time.sleep(3)
 
 session.StopForceControl(smooth_time_ms=800)

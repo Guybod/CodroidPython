@@ -62,7 +62,6 @@ from codroid import (
 def make_compliance(
     stiffness: List[float],
     damping: List[float],
-    axis_enable: List[bool],
     mass: List[float] = None,
     activate: bool = True,
 ) -> dict:
@@ -72,14 +71,12 @@ def make_compliance(
     Args:
         stiffness: 刚度 K [Kx, Ky, Kz, Krx, Kry, Krz] (N/m, N·m/rad)
         damping: 阻尼 D [Dx, Dy, Dz, Drx, Dry, Drz] (N·s/m, N·m·s/rad)
-        axis_enable: 各轴是否启用柔顺 [bool x 6]
         mass: 质量 M [Mx, My, Mz, Mrx, Mry, Mrz] (kg, kg·m²)，导纳须 >0
         activate: 是否激活该原语
     """
     block = {
         "stiffness": stiffness,
         "damping": damping,
-        "axisEnable": axis_enable,
         "activate": activate,
     }
     if mass is not None:
@@ -91,7 +88,6 @@ def make_constant_force(
     stiffness: List[float],
     damping: List[float],
     desired_force: List[float],
-    axis_enable: List[bool],
     mass: List[float] = None,
     ramp_time_ms: float = 500.0,
     activate: bool = True,
@@ -103,7 +99,6 @@ def make_constant_force(
         stiffness: 刚度 K（纯力跟踪取 0）
         damping: 阻尼 D
         desired_force: 期望力 [Fx, Fy, Fz, Mx, My, Mz] (N / N·m)
-        axis_enable: 各轴是否启用恒力 [bool x 6]
         mass: 质量 M，导纳须 >0
         ramp_time_ms: 期望力从 0 斜坡到目标的时长 (ms)
         activate: 是否激活该原语
@@ -112,7 +107,6 @@ def make_constant_force(
         "stiffness": stiffness,
         "damping": damping,
         "desiredForce": desired_force,
-        "axisEnable": axis_enable,
         "rampTimeMs": ramp_time_ms,
         "activate": activate,
     }
@@ -141,33 +135,31 @@ def print_force_state(robot) -> None:
 def demo_admittance_compliance(robot) -> None:
     """
     导纳柔顺演示：
-    - Z 平动方向柔顺（外力推动即顺从）
-    - 其余方向位控保持
+    - 全轴柔顺（外力推动即顺从）
     - 配合脚本运动，在运动过程中保持柔顺
     """
     print("\n===== 演示一：导纳-柔顺 =====")
-    print("场景：Z 轴柔顺，XY 位控，配合直线运动\n")
+    print("场景：全轴柔顺，配合直线运动\n")
 
     # --- 第一步：配参 ---
     # 柔顺参数说明：
-    #   - stiffness 越低 → 越容易顺从（Z=500 N/m 较低）
-    #   - damping 适当 → 抑制振荡（Z=25 N·s/m）
+    #   - stiffness 越低 → 越容易顺从（800 N/m 适中）
+    #   - damping 适当 → 抑制振荡（250 N·s/m）
     #   - mass 导纳算法须 >0（期望惯量）
-    stiffness = [0.0, 0.0, 500.0, 0.0, 0.0, 0.0]   # N/m
-    damping   = [0.0, 0.0,  25.0, 0.0, 0.0, 0.0]   # N·s/m
-    mass      = [0.5, 0.5,   0.5, 0.02, 0.02, 0.02]  # kg
-    axis_enable = [False, False, True, False, False, False]
+    stiffness = [800, 800, 800, 50, 50, 50]   # N/m
+    damping   = [250, 250, 250, 7.5, 7.5, 7.5]   # N·s/m
+    mass      = [2.5, 2.5, 2.5, 0.15, 0.15, 0.15]  # kg
 
-    compliance = make_compliance(stiffness, damping, axis_enable, mass=mass)
+    compliance = make_compliance(stiffness, damping, mass=mass)
 
-    # 选择矩阵 S：Z=柔顺，其余=位控
+    # 选择矩阵 S：全轴柔顺
     axis_mode = [
-        ForceAxisMode.POSITION,  # X: 位控
-        ForceAxisMode.POSITION,  # Y: 位控
-        ForceAxisMode.COMPLIANT, # Z: 柔顺
-        ForceAxisMode.POSITION,  # RX: 位控
-        ForceAxisMode.POSITION,  # RY: 位控
-        ForceAxisMode.POSITION,  # RZ: 位控
+        ForceAxisMode.COMPLIANT,  # X: 柔顺
+        ForceAxisMode.COMPLIANT,  # Y: 柔顺
+        ForceAxisMode.COMPLIANT,  # Z: 柔顺
+        ForceAxisMode.COMPLIANT,  # RX: 柔顺
+        ForceAxisMode.COMPLIANT,  # RY: 柔顺
+        ForceAxisMode.COMPLIANT,  # RZ: 柔顺
     ]
 
     # initForceControl: 一次性配参（无斜坡，立即下发）
@@ -176,7 +168,7 @@ def demo_admittance_compliance(robot) -> None:
         axis_mode=axis_mode,
         compliance=compliance,
     )
-    print("✓ 配参完成（导纳 + TCP 系 + Z 柔顺）")
+    print("✓ 配参完成（导纳 + TCP 系 + 全轴柔顺）")
 
     # --- 第二步：进入力控 ---
     robot.StartForceControl()
@@ -184,7 +176,7 @@ def demo_admittance_compliance(robot) -> None:
     time.sleep(2)  # 等待力控正式生效
 
     # --- 第三步：运动 + 轮询状态 ---
-    print("\n开始运动（Z 轴柔顺中，外力可推动）...")
+    print("\n开始运动（全轴柔顺中，外力可推动）...")
     p1 = JointPoint.Degrees([0, 0, 90, 0, 90, 0])
     p2 = JointPoint.Degrees([20, 0, 90, 0, 90, 0])
 
@@ -211,7 +203,7 @@ def demo_admittance_compliance(robot) -> None:
 def demo_admittance_constant_force(robot) -> None:
     """
     导纳恒力跟踪演示：
-    - Z 方向保持 -2N 向下压力
+    - Z 方向保持 2N 压力
     - 运行中通过 tuneForceParams 在线调整期望力
     - 展示斜坡平滑加载效果
     """
@@ -222,16 +214,15 @@ def demo_admittance_constant_force(robot) -> None:
     # 纯力跟踪参数说明：
     #   - stiffness = 0 → 纯力跟踪（无弹性回复）
     #   - damping / mass → 决定跟踪柔度和响应速度
-    #   - desired_force Z = -2N → 向下压 2 牛顿
+    #   - desired_force Z = 2N → 向下压 2 牛顿
     #   - ramp_time_ms = 500 → 期望力 500ms 斜坡加载，避免冲击
-    stiffness     = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]    # N/m（纯力跟踪取 0）
-    damping       = [0.0, 0.0, 25.0, 0.0, 0.0, 0.0]   # N·s/m
-    mass          = [0.5, 0.5, 0.5, 0.02, 0.02, 0.02]  # kg
-    desired_force = [0.0, 0.0, -2.0, 0.0, 0.0, 0.0]    # N（Z 向下 2N）
-    force_enable  = [False, False, True, False, False, False]
+    stiffness     = [0, 0, 0, 0, 0, 0]    # N/m（纯力跟踪取 0）
+    damping       = [250, 250, 250, 7.5, 7.5, 7.5]   # N·s/m
+    mass          = [2.5, 2.5, 2.5, 0.15, 0.15, 0.15]  # kg
+    desired_force = [0.0, 0.0, 2.0, 0.0, 0.0, 0.0]    # N（Z 向下 2N）
 
     constant_force = make_constant_force(
-        stiffness, damping, desired_force, force_enable,
+        stiffness, damping, desired_force,
         mass=mass, ramp_time_ms=500.0,
     )
 
@@ -250,7 +241,7 @@ def demo_admittance_constant_force(robot) -> None:
         axis_mode=axis_mode,
         constant_force=constant_force,
     )
-    print("✓ 配参完成（导纳 + TCP 系 + Z 恒力 -2N）")
+    print("✓ 配参完成（导纳 + TCP 系 + Z 恒力 2N）")
 
     # --- 第二步：进入力控 ---
     robot.StartForceControl()
@@ -262,25 +253,86 @@ def demo_admittance_constant_force(robot) -> None:
     time.sleep(3)
     print_force_state(robot)
 
-    # 在线提升目标压力到 10N
-    print("-- 在线提升目标压力到 -10N --")
-    robot.TuneForceParams(desired_force=[0.0, 0.0, -10.0, 0.0, 0.0, 0.0])
+    # 在线提升目标压力到 5N
+    print("-- 在线提升目标压力到 5N --")
+    robot.TuneForceParams(desired_force=[0.0, 0.0, 5.0, 0.0, 0.0, 0.0])
     time.sleep(3)
     print_force_state(robot)
 
-    # 在线提升目标压力到 30N
-    print("-- 在线提升目标压力到 -30N --")
-    robot.TuneForceParams(desired_force=[0.0, 0.0, -30.0, 0.0, 0.0, 0.0])
+    # 在线提升目标压力到 20N
+    print("-- 在线提升目标压力到 20N --")
+    robot.TuneForceParams(desired_force=[0.0, 0.0, 20.0, 0.0, 0.0, 0.0])
     time.sleep(3)
     print_force_state(robot)
 
-    # 在线降低目标压力到 5N
-    print("-- 在线降低目标压力到 -5N --")
-    robot.TuneForceParams(desired_force=[0.0, 0.0, -5.0, 0.0, 0.0, 0.0])
+    # 在线降低目标压力到 1N
+    print("-- 在线降低目标压力到 1N --")
+    robot.TuneForceParams(desired_force=[0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
     time.sleep(3)
     print_force_state(robot)
 
     # --- 第四步：平滑退出 ---
+    robot.StopForceControl(smooth_time_ms=800)
+    print("✓ 力控已平滑退出")
+    time.sleep(1)
+
+
+# =============================================================================
+# 演示三：柔顺 + 恒力组合（X/Y 柔顺 + Z 恒力）
+# =============================================================================
+
+def demo_combined(robot) -> None:
+    """
+    柔顺 + 恒力组合演示：
+    - X/Y 方向柔顺（低刚度，可顺从外力）
+    - Z 方向恒力跟踪（10N 向下压力）
+    - 其余方向位控保持
+    """
+    print("\n===== 演示三：柔顺 + 恒力组合 =====")
+    print("场景：X/Y 柔顺 + Z 恒力 10N\n")
+
+    # --- 柔顺配置（X/Y 方向）---
+    stiffness  = [800, 800, 800, 50, 50, 50]   # N/m
+    damping    = [250, 250, 250, 7.5, 7.5, 7.5]   # N·s/m
+    mass       = [2.5, 2.5, 2.5, 0.15, 0.15, 0.15]  # kg
+    compliance = make_compliance(stiffness, damping, mass=mass)
+
+    # --- 恒力配置（Z 方向）---
+    stiffness_cf = [0, 0, 0, 0, 0, 0]   # N/m（纯力跟踪取 0）
+    desired_force = [0.0, 0.0, 10.0, 0.0, 0.0, 0.0]  # N（Z 向下 10N）
+    constant_force = make_constant_force(
+        stiffness_cf, damping, desired_force,
+        mass=mass, ramp_time_ms=500.0,
+    )
+
+    # 选择矩阵 S：X/Y=柔顺, Z=力控, 其余=位控
+    axis_mode = [
+        ForceAxisMode.COMPLIANT,  # X: 柔顺
+        ForceAxisMode.COMPLIANT,  # Y: 柔顺
+        ForceAxisMode.FORCE,      # Z: 力控
+        ForceAxisMode.POSITION,   # RX: 位控
+        ForceAxisMode.POSITION,   # RY: 位控
+        ForceAxisMode.POSITION,   # RZ: 位控
+    ]
+
+    robot.InitForceControl(
+        frame=ForceFrame.TCP,
+        axis_mode=axis_mode,
+        compliance=compliance,
+        constant_force=constant_force,
+    )
+    print("✓ 配参完成（X/Y 柔顺 + Z 恒力 10N）")
+
+    # --- 进入力控 ---
+    robot.StartForceControl()
+    print("✓ 已进入力控，原地等待 40s...\n")
+
+    # --- 轮询状态 ---
+    for i in range(4):
+        time.sleep(10)
+        print_force_state(robot)
+
+    # --- 平滑退出 ---
     robot.StopForceControl(smooth_time_ms=800)
     print("✓ 力控已平滑退出")
     time.sleep(1)
@@ -294,7 +346,7 @@ def main(argv: list[str]) -> int:
     # ---------- 命令行参数 ----------
     p = argparse.ArgumentParser(description="力控工艺包演示")
     p.add_argument("--robot", default="192.168.1.136", help="控制器 IP")
-    p.add_argument("--demo", choices=["compliance", "constant_force", "all"],
+    p.add_argument("--demo", choices=["compliance", "constant_force", "combined", "all"],
                    default="all", help="选择演示场景")
     args = p.parse_args(argv)
 
@@ -319,6 +371,9 @@ def main(argv: list[str]) -> int:
 
             if args.demo in ("constant_force", "all"):
                 demo_admittance_constant_force(robot)
+
+            if args.demo in ("combined", "all"):
+                demo_combined(robot)
 
         except KeyboardInterrupt:
             print("\n已中断，正在安全退出力控...")

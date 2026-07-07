@@ -62,16 +62,14 @@ def main():
                 ForceAxisMode.POSITION,  # RZ: 位控
             ],
             constant_force={
-                # 各轴恒力使能：[X, Y, Z, RX, RY, RZ]，True=启用恒力
-                "axisEnable": [False, False, True, False, False, False],
                 # 期望力/力矩：[Fx, Fy, Fz, Mx, My, Mz]，单位 N / N·m
-                "desiredForce": [0, 0, 5, 0, 0, 0],
+                "desiredForce": [0, 0, 2, 0, 0, 0],
                 # 刚度 K：纯力跟踪取 0，单位 N/m、N·m/rad
                 "stiffness": [0, 0, 0, 0, 0, 0],
                 # 阻尼 D：抑制振荡，单位 N·s/m、N·m·s/rad
-                "damping": [0, 0, 125, 0, 0, 0],
+                "damping": [250, 250, 250, 7.5, 7.5, 7.5],
                 # 质量 M：导纳算法须 >0，单位 kg、kg·m²
-                "mass": [0.5, 0.5, 0.5, 0.02, 0.02, 0.02],
+                "mass": [2.5, 2.5, 2.5, 0.15, 0.15, 0.15],
             },
         )
         robot.StartForceControl()

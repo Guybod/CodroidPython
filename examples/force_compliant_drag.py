@@ -39,8 +39,7 @@ def main():
 
         # 配参：所有轴柔顺（低刚度，可拖拽）
         robot.InitForceControl(
-            frame=ForceFrame.TCP,       # 世界坐标系
-            # frame=ForceFrame.TCP,       # 工具坐标系
+            frame=ForceFrame.TCP,       # 工具坐标系
             axis_mode=[
                 ForceAxisMode.COMPLIANT,  # X: 柔顺
                 ForceAxisMode.COMPLIANT,  # Y: 柔顺
@@ -50,13 +49,10 @@ def main():
                 ForceAxisMode.COMPLIANT,  # RZ: 柔顺
             ],
             compliance={
-                # 各轴柔顺使能
-                "axisEnable": [True, True, True, True, True, True],
                 # 刚度 K：越低越容易拖动（N/m, N·m/rad）
-                # "stiffness": [10, 10, 10, 0.5, 0.5, 0.5],
-                "stiffness": [0, 0, 0, 0, 0, 0],
-                # 阻尼 D：越低越省力（N·s/m, N·m·s/rad）
-                "damping": [250, 250, 50, 7.5, 7.5, 7.5],
+                "stiffness": [800, 800, 800, 50, 50, 50],
+                # 阻尼 D：抑制振荡（N·s/m, N·m·s/rad）
+                "damping": [250, 250, 250, 7.5, 7.5, 7.5],
                 # 质量 M：导纳算法须 >0（kg, kg·m²）
                 "mass": [2.5, 2.5, 2.5, 0.15, 0.15, 0.15],
             },
