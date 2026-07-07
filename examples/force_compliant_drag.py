@@ -37,22 +37,22 @@ def main():
         robot.FTSensorDriftCalibration()
         print("✓ 零力校准完成\n")
 
-        # 配参：所有轴柔顺（低刚度，可拖拽）
+        # 配参：Z 轴柔顺，其余位控
         robot.InitForceControl(
             frame=ForceFrame.TCP,       # 工具坐标系
             axis_mode=[
-                ForceAxisMode.COMPLIANT,  # X: 柔顺
-                ForceAxisMode.COMPLIANT,  # Y: 柔顺
-                ForceAxisMode.COMPLIANT,  # Z: 柔顺
-                ForceAxisMode.COMPLIANT,  # RX: 柔顺
-                ForceAxisMode.COMPLIANT,  # RY: 柔顺
-                ForceAxisMode.COMPLIANT,  # RZ: 柔顺
+                ForceAxisMode.POSITION,  # X: 位控
+                ForceAxisMode.POSITION,  # Y: 位控
+                ForceAxisMode.COMPLIANT, # Z: 柔顺
+                ForceAxisMode.POSITION,  # RX: 位控
+                ForceAxisMode.POSITION,  # RY: 位控
+                ForceAxisMode.POSITION,  # RZ: 位控
             ],
             compliance={
                 # 刚度 K：越低越容易拖动（N/m, N·m/rad）
-                "stiffness": [800, 800, 800, 50, 50, 50],
-                # 阻尼 D：抑制振荡（N·s/m, N·m·s/rad）
-                "damping": [250, 250, 250, 7.5, 7.5, 7.5],
+                "stiffness": [0, 0, 0, 0, 0, 0],
+                # 阻尼 D：越低越省力（N·s/m, N·m·s/rad）
+                "damping": [250, 250, 50, 7.5, 7.5, 7.5],
                 # 质量 M：导纳算法须 >0（kg, kg·m²）
                 "mass": [2.5, 2.5, 2.5, 0.15, 0.15, 0.15],
             },
