@@ -2,7 +2,7 @@
 """
 Z 轴 2N 恒力 + 正方形环绕示例
 
-启动后给 Z 轴一个 2N 恒力，然后用 runScript 执行正方形环绕运动。
+启动后给 Z 轴一个 2N 恒力，然后用 MovLSync 执行正方形环绕运动。
 
 【运行】
   PYTHONPATH=src python3 examples/force_z_5n.py
@@ -17,6 +17,7 @@ from codroid import (
     CodroidControlInterface,
     ForceFrame,
     ForceAxisMode,
+    CartesianPoint,
     InitConsoleUtf8,
 )
 
@@ -35,20 +36,17 @@ def main():
         cx, cy, cz, crx, cry, crz = 494.141, 190.096, 397.696, 179.999, 0, -90
         half = 50
 
-        # 四个角点（协议格式）
-        bl = {"cp": [cx - half, cy - half, cz, crx, cry, crz]}  # 左下(XY最小)
-        br = {"cp": [cx + half, cy - half, cz, crx, cry, crz]}  # 右下
-        tr = {"cp": [cx + half, cy + half, cz, crx, cry, crz]}  # 右上
-        tl = {"cp": [cx - half, cy + half, cz, crx, cry, crz]}  # 左上
-        st = {"cp": [cx, cy, cz, crx, cry, crz]}                # 起点
+        # 四个角点（CartesianPoint）
+        bl = CartesianPoint(cx - half, cy - half, cz, crx, cry, crz)  # 左下
+        br = CartesianPoint(cx + half, cy - half, cz, crx, cry, crz)  # 右下
+        tr = CartesianPoint(cx + half, cy + half, cz, crx, cry, crz)  # 右上
+        tl = CartesianPoint(cx - half, cy + half, cz, crx, cry, crz)  # 左上
+        st = CartesianPoint(cx, cy, cz, crx, cry, crz)                # 起点
 
-        # 第一步：用 runScript 移动到左下（不启动力控）
+        # 第一步：移动到左下起点（不启动力控）
         print("移动到左下起点...")
-        robot._send_command("project/runScript", {
-            "scripts": {"main": "movL(bl, {v=100, a=500})"},
-            "vars": {"bl": bl},
-        })
-        time.sleep(3)
+        robot.MovLSync(bl, 100, 500)
+        print("✓ 已到达起点")
 
         # 第二步：配参并启动力控
         robot.InitForceControl(
@@ -75,37 +73,29 @@ def main():
         robot.StartForceControl()
         print("✓ 力控已启动（Z 轴 2N）")
 
-        # 第三步：用 runScript 执行正方形环绕（两圈回起点）
-        script = """
-            movL(br, {v=50, a=500})
-            movL(tr, {v=50, a=500})
-            movL(tl, {v=50, a=500})
-            movL(bl, {v=50, a=500})
-            movL(br, {v=50, a=500})
-            movL(tr, {v=50, a=500})
-            movL(tl, {v=50, a=500})
-            movL(bl, {v=50, a=500})
-            movL(st, {v=50, a=500})
-        """
-        robot._send_command("project/runScript", {
-            "scripts": {"main": script},
-            "vars": {"bl": bl, "br": br, "tr": tr, "tl": tl, "st": st},
-        })
-        print("✓ 环绕脚本已下发")
+        # 第三步：正方形环绕（两圈回起点）
+        print("开始环绕运动...")
+        for i in range(2):
+            print(f"  第 {i+1} 圈")
+            robot.MovLSync(br, 50, 500)
+            robot.MovLSync(tr, 50, 500)
+            robot.MovLSync(tl, 50, 500)
+            robot.MovLSync(bl, 50, 500)
 
-        try:
-            print("Ctrl+C 退出...")
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            print("\n正在退出力控...")
-        finally:
-            robot.StopForceControl(smooth_time_ms=500)
-            robot.ToAuto()
-            robot.ToManual()
-            time.sleep(1)
-            robot.SwitchOff()
-            print("✓ 已退出")
+        # 回到起点
+        robot.MovLSync(st, 50, 500)
+        print("✓ 环绕完成")
+
+        # 退出力控
+        robot.StopForceControl(smooth_time_ms=500)
+        print("✓ 力控已退出")
+
+        # 下电
+        robot.ToAuto()
+        robot.ToManual()
+        time.sleep(1)
+        robot.SwitchOff()
+        print("✓ 已退出")
 
 
 if __name__ == "__main__":

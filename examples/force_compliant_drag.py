@@ -28,9 +28,11 @@ def main():
     with CodroidControlInterface(host=host) as robot:
         # 清错 → 自动 → 远程 → 上电
         robot.ClearSystemError()
+        time.sleep(2)
         robot.EnterRemoteModeViaAuto()
+        time.sleep(2)
         robot.SwitchOn()
-        time.sleep(5)
+        time.sleep(2)
 
         # 零力校准（清零传感器，避免虚假外力）
         print("零力校准中...")
@@ -54,7 +56,7 @@ def main():
                 # 阻尼 D：越低越省力（N·s/m, N·m·s/rad）
                 "damping": [250, 250, 50, 7.5, 7.5, 7.5],
                 # 质量 M：导纳算法须 >0（kg, kg·m²）
-                "mass": [2.5, 2.5, 2.5, 0.15, 0.15, 0.15],
+                "mass": [2.5, 2.5, 1.5, 0.15, 0.15, 0.15],
             },
         )
 
