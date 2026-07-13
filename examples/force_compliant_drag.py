@@ -36,19 +36,19 @@ def main():
 
         # 零力校准（清零传感器，避免虚假外力）
         print("零力校准中...")
-        robot.FTSensorDriftCalibration()
+        robot.ZeroForceCalibration()
         print("✓ 零力校准完成\n")
 
         # 配参：Z 轴柔顺，其余位控
         robot.InitForceControl(
             frame=ForceFrame.TCP,       # 工具坐标系
             axis_mode=[
-                ForceAxisMode.POSITION,  # X: 位控
-                ForceAxisMode.POSITION,  # Y: 位控
+                ForceAxisMode.COMPLIANT,  # X: 柔顺
+                ForceAxisMode.COMPLIANT,  # Y: 柔顺
                 ForceAxisMode.COMPLIANT, # Z: 柔顺
-                ForceAxisMode.POSITION,  # RX: 位控
-                ForceAxisMode.POSITION,  # RY: 位控
-                ForceAxisMode.POSITION,  # RZ: 位控
+                ForceAxisMode.COMPLIANT,  # RX: 柔顺
+                ForceAxisMode.COMPLIANT,  # RY: 柔顺
+                ForceAxisMode.COMPLIANT,  # RZ: 柔顺
             ],
             compliance={
                 # 刚度 K：越低越容易拖动（N/m, N·m/rad）

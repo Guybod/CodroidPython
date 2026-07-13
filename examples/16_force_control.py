@@ -15,7 +15,8 @@
 
 【涉及协议】
   - TCP：Robot/initForceControl, startForceControl, stopForceControl,
-         tuneForceParams, getForceState
+         tuneForceParams, startContactDetection, getForceState,
+         setOverforceProtection, setForceDataHealth, ZeroForceCalibration
 
 【运行】
   均在项目根目录 CodroidPython/ 执行。
@@ -33,7 +34,7 @@
 
 【注意】
   - 力控进入前须确保 TCP 速度 ≈ 0（>1e-3 m/s 会被拒绝）
-  - 过力保护为内置安全机制，无法通过 API 关闭
+  - 过力保护与力数据健康监控可通过 API 临时调整；关闭安全监控需谨慎
   - 六维顺序统一为 [X, Y, Z, RX, RY, RZ]，力/力矩单位 N / N·m
 """
 from __future__ import annotations
@@ -63,7 +64,6 @@ def make_compliance(
     stiffness: List[float],
     damping: List[float],
     mass: List[float] = None,
-    activate: bool = True,
 ) -> dict:
     """
     构造柔顺原语配置块。
@@ -72,12 +72,10 @@ def make_compliance(
         stiffness: 刚度 K [Kx, Ky, Kz, Krx, Kry, Krz] (N/m, N·m/rad)
         damping: 阻尼 D [Dx, Dy, Dz, Drx, Dry, Drz] (N·s/m, N·m·s/rad)
         mass: 质量 M [Mx, My, Mz, Mrx, Mry, Mrz] (kg, kg·m²)，导纳须 >0
-        activate: 是否激活该原语
     """
     block = {
         "stiffness": stiffness,
         "damping": damping,
-        "activate": activate,
     }
     if mass is not None:
         block["mass"] = mass
@@ -85,30 +83,24 @@ def make_compliance(
 
 
 def make_constant_force(
-    stiffness: List[float],
     damping: List[float],
     desired_force: List[float],
     mass: List[float] = None,
     ramp_time_ms: float = 500.0,
-    activate: bool = True,
 ) -> dict:
     """
     构造恒力原语配置块。
 
     Args:
-        stiffness: 刚度 K（纯力跟踪取 0）
         damping: 阻尼 D
         desired_force: 期望力 [Fx, Fy, Fz, Mx, My, Mz] (N / N·m)
         mass: 质量 M，导纳须 >0
         ramp_time_ms: 期望力从 0 斜坡到目标的时长 (ms)
-        activate: 是否激活该原语
     """
     block = {
-        "stiffness": stiffness,
         "damping": damping,
         "desiredForce": desired_force,
         "rampTimeMs": ramp_time_ms,
-        "activate": activate,
     }
     if mass is not None:
         block["mass"] = mass
@@ -117,14 +109,13 @@ def make_constant_force(
 
 def print_force_state(robot) -> None:
     """打印当前力控状态。"""
-    state = robot.GetForceState()
-    print(f"  力控已启用: {state.enabled}")
-    print(f"  外力数据有效: {state.valid}")
-    print(f"  TCP 外力: {[f'{v:.1f}' for v in state.wrench_tcp]}")
-    print(f"  期望力: {[f'{v:.1f}' for v in state.desired_wrench]}")
-    print(f"  力跟踪误差: {[f'{v:.2f}' for v in state.track_error]}")
-    print(f"  接触判定: {state.is_contact}, 过力判定: {state.is_overforce}")
-    print(f"  健康状态: {ForceHealth(state.health).name}")
+    print(f"  力控已启用: {robot.GetForceStateEnabled()}")
+    print(f"  外力数据有效: {robot.GetForceStateValid()}")
+    print(f"  TCP 外力: {[f'{v:.1f}' for v in robot.GetForceStateWrenchTcp()]}")
+    print(f"  期望力: {[f'{v:.1f}' for v in robot.GetForceStateDesiredWrench()]}")
+    print(f"  力跟踪误差: {[f'{v:.2f}' for v in robot.GetForceStateTrackError()]}")
+    print(f"  接触判定: {robot.GetForceStateIsContact()}, 过力判定: {robot.GetForceStateIsOverforce()}")
+    print(f"  健康状态: {ForceHealth(robot.GetForceStateHealth()).name}")
     print()
 
 
@@ -212,17 +203,15 @@ def demo_admittance_constant_force(robot) -> None:
 
     # --- 第一步：配参 ---
     # 纯力跟踪参数说明：
-    #   - stiffness = 0 → 纯力跟踪（无弹性回复）
     #   - damping / mass → 决定跟踪柔度和响应速度
     #   - desired_force Z = 2N → 向下压 2 牛顿
     #   - ramp_time_ms = 500 → 期望力 500ms 斜坡加载，避免冲击
-    stiffness     = [0, 0, 0, 0, 0, 0]    # N/m（纯力跟踪取 0）
     damping       = [250, 250, 250, 7.5, 7.5, 7.5]   # N·s/m
     mass          = [2.5, 2.5, 2.5, 0.15, 0.15, 0.15]  # kg
     desired_force = [0.0, 0.0, 2.0, 0.0, 0.0, 0.0]    # N（Z 向下 2N）
 
     constant_force = make_constant_force(
-        stiffness, damping, desired_force,
+        damping, desired_force,
         mass=mass, ramp_time_ms=500.0,
     )
 
@@ -255,19 +244,19 @@ def demo_admittance_constant_force(robot) -> None:
 
     # 在线提升目标压力到 5N
     print("-- 在线提升目标压力到 5N --")
-    robot.TuneForceParams(desired_force=[0.0, 0.0, 5.0, 0.0, 0.0, 0.0])
+    robot.TuneForceParams(desired_force=[0.0, 0.0, 5.0, 0.0, 0.0, 0.0], ramp_time=500)
     time.sleep(3)
     print_force_state(robot)
 
     # 在线提升目标压力到 20N
     print("-- 在线提升目标压力到 20N --")
-    robot.TuneForceParams(desired_force=[0.0, 0.0, 20.0, 0.0, 0.0, 0.0])
+    robot.TuneForceParams(desired_force=[0.0, 0.0, 20.0, 0.0, 0.0, 0.0], ramp_time=500)
     time.sleep(3)
     print_force_state(robot)
 
     # 在线降低目标压力到 1N
     print("-- 在线降低目标压力到 1N --")
-    robot.TuneForceParams(desired_force=[0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
+    robot.TuneForceParams(desired_force=[0.0, 0.0, 1.0, 0.0, 0.0, 0.0], ramp_time=500)
     time.sleep(3)
     print_force_state(robot)
 
@@ -298,10 +287,9 @@ def demo_combined(robot) -> None:
     compliance = make_compliance(stiffness, damping, mass=mass)
 
     # --- 恒力配置（Z 方向）---
-    stiffness_cf = [0, 0, 0, 0, 0, 0]   # N/m（纯力跟踪取 0）
     desired_force = [0.0, 0.0, 10.0, 0.0, 0.0, 0.0]  # N（Z 向下 10N）
     constant_force = make_constant_force(
-        stiffness_cf, damping, desired_force,
+        damping, desired_force,
         mass=mass, ramp_time_ms=500.0,
     )
 
@@ -363,7 +351,7 @@ def main(argv: list[str]) -> int:
 
         try:
             # 建议：进入力控前执行零力校准
-            robot.FTSensorDriftCalibration()
+            robot.ZeroForceCalibration()
             time.sleep(1)
 
             if args.demo in ("compliance", "all"):

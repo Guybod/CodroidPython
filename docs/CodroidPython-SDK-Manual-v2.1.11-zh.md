@@ -12,10 +12,11 @@
 | 2 | [核心概念](#核心概念) | 生命周期、TCP 模型、单位约定、异常处理 |
 | 3 | [CodroidSession / CodroidClient API](#codroidsession--codroidclient-api-参考) | 主客户端完整 API 参考 |
 | 4 | [运动 API](#运动-api-参考) | JointPoint、CartesianPoint、MoveInstruction、MotionWaitOptions |
-| 5 | [数据类型与枚举](#数据类型与枚举) | CommonResponse、CriRealTimeData、RobotFrame、GlobalVariable |
-| 6 | [CRI 实时数据与控制](#cri-实时数据与控制-api-参考) | CriRealtimeDispatcher、TrajectoryGenerator、PacketParser |
-| 7 | [IO 与寄存器](#io-与寄存器-api-参考) | DI/DO/AI/AO 操作、寄存器读写 |
-| 8 | [辅助工具](#辅助工具-api-参考) | 发布/订阅、全局变量、运动学、ConsoleUtf8 |
+| 5 | [力控 API](#力控-api-参考) | 导纳力控、零力校准、接触检测、安全监控 |
+| 6 | [数据类型与枚举](#数据类型与枚举) | CommonResponse、CriRealTimeData、RobotFrame、GlobalVariable |
+| 7 | [CRI 实时数据与控制](#cri-实时数据与控制-api-参考) | CriRealtimeDispatcher、TrajectoryGenerator、PacketParser |
+| 8 | [IO 与寄存器](#io-与寄存器-api-参考) | DI/DO/AI/AO 操作、寄存器读写 |
+| 9 | [辅助工具](#辅助工具-api-参考) | 发布/订阅、全局变量、运动学、ConsoleUtf8 |
 
 ---
 
@@ -3155,6 +3156,180 @@ with CodroidClient(host="192.168.8.136") as robot:
 ```
 
 <div style="page-break-after: always;"></div>
+
+## 力控 API 参考
+
+Python SDK 当前固定使用导纳算法进入力控：`InitForceControl()` 内部固定下发 `algo=1`。SDK 已提供 `ForceControlAlgo` 枚举用于对齐协议值，但当前版本不开放 `algo` 入参。
+
+六维力控数组顺序统一为 `[Fx, Fy, Fz, Mx, My, Mz]`，单位为 N / N·m。
+
+### 力控枚举
+
+```python
+class ForceControlAlgo(IntEnum):
+    IMPEDANCE = 0
+    ADMITTANCE = 1
+    PD_FORCE = 2
+
+class ForceFrame(IntEnum):
+    TCP = 0
+    USER = 1
+    WORLD = 2
+
+class ForceAxisMode(IntEnum):
+    POSITION = 0
+    FORCE = 1
+    COMPLIANT = 2
+```
+
+### ZeroForceCalibration
+
+```python
+def ZeroForceCalibration(
+    self,
+    calibration_time_ms: int = 1000,
+    timeout_ms: int = 5000,
+) -> CommonResponse
+```
+
+`calibration_time_ms` 下发为 `calibrationTimeMs`；`timeout_ms` 只控制 SDK 本地等待响应的 socket 超时。
+
+### InitForceControl
+
+```python
+def InitForceControl(
+    self,
+    frame: int,
+    axis_mode: List[int],
+    compliance: Optional[Dict[str, Any]] = None,
+    constant_force: Optional[Dict[str, Any]] = None,
+    user_frame_rpy: Optional[List[float]] = None,
+    desired_wrench: Optional[List[float]] = None,
+    force_limit: Optional[Dict[str, Any]] = None,
+) -> CommonResponse
+```
+
+`axis_mode` 是 6 元素选择矩阵：`0` 位控，`1` 力控，`2` 柔顺。恒力和柔顺原语是否激活由 `axis_mode` 决定，不再使用原语内 `activate` 字段。
+
+`constant_force` 支持 `desiredForce`、`damping`、`mass`、`rampTimeMs`、`modulationFreqHz`、`modulationAmplitude`。当 `axis_mode` 含 `FORCE` 轴时，`desiredForce` 必须提供。恒力原语不再配置 `stiffness`。
+
+`compliance` 支持 `stiffness`、`damping`、`mass`、`rampTimeMs`。
+
+```python
+robot.InitForceControl(
+    frame=ForceFrame.TCP,
+    axis_mode=[
+        ForceAxisMode.POSITION,
+        ForceAxisMode.POSITION,
+        ForceAxisMode.FORCE,
+        ForceAxisMode.POSITION,
+        ForceAxisMode.POSITION,
+        ForceAxisMode.POSITION,
+    ],
+    constant_force={
+        "desiredForce": [0, 0, 2, 0, 0, 0],
+        "damping": [250, 250, 250, 7.5, 7.5, 7.5],
+        "mass": [2.5, 2.5, 2.5, 0.15, 0.15, 0.15],
+        "rampTimeMs": 500,
+    },
+)
+```
+
+### StartForceControl / StopForceControl
+
+```python
+def StartForceControl(self) -> CommonResponse
+def StopForceControl(self, smooth_time_ms: int = 500) -> CommonResponse
+```
+
+运动指令执行期间调用 `StopForceControl` 可能被控制器拒绝；推荐先停止运动，或使用程序级 stop 联动力控平滑退出。
+
+### TuneForceParams
+
+```python
+def TuneForceParams(
+    self,
+    stiffness: Optional[List[float]] = None,
+    damping: Optional[List[float]] = None,
+    mass: Optional[List[float]] = None,
+    desired_force: Optional[List[float]] = None,
+    kp: Optional[List[float]] = None,
+    kd: Optional[List[float]] = None,
+    ramp_time: Optional[float] = None,
+) -> CommonResponse
+```
+
+`ramp_time` 下发为 `rampTime`，单位 ms；`0` 表示立即生效。
+
+### StartContactDetection
+
+```python
+def StartContactDetection(
+    self,
+    direction: List[float],
+    feed_velocity: Optional[float] = None,
+    contact_force_threshold: Optional[float] = None,
+    vel_drop_ratio: Optional[float] = None,
+    max_travel: Optional[float] = None,
+    timeout_ms: Optional[float] = None,
+) -> CommonResponse
+```
+
+`direction` 必须是 6 元素列表；`max_travel` 建议显式传入并大于 0。
+
+### SetOverforceProtection
+
+```python
+def SetOverforceProtection(
+    self,
+    enable: Optional[bool] = None,
+    force_threshold: Optional[List[float]] = None,
+    hold_ms: Optional[float] = None,
+) -> CommonResponse
+```
+
+只更新传入字段。`force_threshold` 为 `[Fx,Fy,Fz,Mx,My,Mz]`，0 表示该方向不监测。
+
+### SetForceDataHealth
+
+```python
+def SetForceDataHealth(
+    self,
+    enable: Optional[bool] = None,
+    timeout_ms: Optional[float] = None,
+    max_packet_loss_ratio: Optional[float] = None,
+    packet_loss_window: Optional[int] = None,
+    force_saturation: Optional[float] = None,
+    torque_saturation: Optional[float] = None,
+) -> CommonResponse
+```
+
+只更新传入字段。
+
+### GetForceState
+
+```python
+def GetForceState(self) -> ForceControlState
+```
+
+`GetForceState()` 返回完整状态；也可以按字段单独读取：
+
+```python
+robot.GetForceStateEnabled()       # bool
+robot.GetForceStatePending()       # bool
+robot.GetForceStateAlgo()          # int
+robot.GetForceStateValid()         # bool
+robot.GetForceStateIsContact()     # bool
+robot.GetForceStateIsOverforce()   # bool
+robot.GetForceStateHealth()        # int
+robot.GetForceStateWrenchTcp()     # List[float]
+robot.GetForceStateWrenchBase()    # List[float]
+robot.GetForceStateDesiredWrench() # List[float]
+robot.GetForceStateTrackError()    # List[float]
+robot.GetForceStateAxisMode()      # List[int]
+```
+
+---
 
 ## 辅助工具 API 参考
 

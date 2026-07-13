@@ -1,5 +1,24 @@
 # Codroid Python SDK 版本说明
 
+## Unreleased — 力控 API 更新
+
+### Added
+
+- `ForceControlAlgo` 枚举：`IMPEDANCE=0`、`ADMITTANCE=1`、`PD_FORCE=2`。当前 `InitForceControl()` 仍固定下发导纳 `algo=1`，暂不开放 `algo` 入参。
+- `ZeroForceCalibration(calibration_time_ms=1000, timeout_ms=5000)`：替代旧零力校准入口，`calibration_time_ms` 下发为 `calibrationTimeMs`，`timeout_ms` 仅控制 SDK 本地 socket 超时。
+- `TuneForceParams(..., ramp_time=None)`：新增在线调参斜坡时间，协议字段 `rampTime`。
+- `StartContactDetection()`、`SetOverforceProtection()`、`SetForceDataHealth()`。
+- `GetForceState*` 单字段读取方法，例如 `GetForceStateEnabled()`、`GetForceStateWrenchTcp()`。
+
+### Changed
+
+- 恒力原语配置不再使用 `stiffness` / `activate`；作用轴和激活状态由 `axis_mode` 决定。
+- 力控示例和文档同步到新版 API：`examples/16_force_control.py`、`force_z_5n.py`、`force_compliant_drag.py`、`force_compliant_motion.py`、`force_read_state.py`。
+
+### Removed
+
+- `FTSensorDriftCalibration()` 已移除。
+
 ## 2.1.10 — 容差字段彻底移除
 
 ### Breaking Change

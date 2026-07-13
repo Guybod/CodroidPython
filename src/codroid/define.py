@@ -150,6 +150,14 @@ class ForceFrame(IntEnum):
     WORLD = 2  # 世界系
 
 
+class ForceControlAlgo(IntEnum):
+    """力控算法 / Force control algorithm."""
+
+    IMPEDANCE = 0   # 阻抗
+    ADMITTANCE = 1  # 导纳
+    PD_FORCE = 2    # PD 力控
+
+
 class ForceAxisMode(IntEnum):
     """力控轴模式 / Force control axis mode."""
 

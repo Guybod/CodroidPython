@@ -12,10 +12,11 @@
 | 2 | [Core Concepts](#core-concepts) | Lifecycle, TCP model, unit conventions, error handling |
 | 3 | [CodroidSession / CodroidClient API](#codroidsession--codroidclient-api-reference) | Main client full API reference |
 | 4 | [Motion API](#motion-api-reference) | JointPoint, CartesianPoint, MoveInstruction, MotionWaitOptions |
-| 5 | [Data Types & Enums](#data-types--enums) | CommonResponse, CriRealTimeData, RobotFrame, GlobalVariable |
-| 6 | [CRI Real-time Data & Control](#cri-real-time-data--control-api-reference) | CriRealtimeDispatcher, TrajectoryGenerator, PacketParser |
-| 7 | [IO & Registers](#io--registers-api-reference) | DI/DO/AI/AO operations, register read/write |
-| 8 | [Utilities](#utilities-api-reference) | Publish/Subscribe, global variables, kinematics, ConsoleUtf8 |
+| 5 | [Force Control API](#force-control-api-reference) | Admittance force control, zero-force calibration, contact detection, safety monitors |
+| 6 | [Data Types & Enums](#data-types--enums) | CommonResponse, CriRealTimeData, RobotFrame, GlobalVariable |
+| 7 | [CRI Real-time Data & Control](#cri-real-time-data--control-api-reference) | CriRealtimeDispatcher, TrajectoryGenerator, PacketParser |
+| 8 | [IO & Registers](#io--registers-api-reference) | DI/DO/AI/AO operations, register read/write |
+| 9 | [Utilities](#utilities-api-reference) | Publish/Subscribe, global variables, kinematics, ConsoleUtf8 |
 
 ---
 
@@ -2626,6 +2627,180 @@ with CodroidClient(host="192.168.8.136") as robot:
 ```
 
 <div style="page-break-after: always;"></div>
+
+## Force Control API Reference
+
+The Python SDK currently enters force control with the admittance algorithm only: `InitForceControl()` always sends `algo=1`. `ForceControlAlgo` is exported for protocol value alignment, but this SDK version does not expose an `algo` argument.
+
+Six-axis force arrays always use `[Fx, Fy, Fz, Mx, My, Mz]`, in N / N·m.
+
+### Force Control Enums
+
+```python
+class ForceControlAlgo(IntEnum):
+    IMPEDANCE = 0
+    ADMITTANCE = 1
+    PD_FORCE = 2
+
+class ForceFrame(IntEnum):
+    TCP = 0
+    USER = 1
+    WORLD = 2
+
+class ForceAxisMode(IntEnum):
+    POSITION = 0
+    FORCE = 1
+    COMPLIANT = 2
+```
+
+### ZeroForceCalibration
+
+```python
+def ZeroForceCalibration(
+    self,
+    calibration_time_ms: int = 1000,
+    timeout_ms: int = 5000,
+) -> CommonResponse
+```
+
+`calibration_time_ms` is sent as `calibrationTimeMs`; `timeout_ms` only controls the local SDK socket timeout.
+
+### InitForceControl
+
+```python
+def InitForceControl(
+    self,
+    frame: int,
+    axis_mode: List[int],
+    compliance: Optional[Dict[str, Any]] = None,
+    constant_force: Optional[Dict[str, Any]] = None,
+    user_frame_rpy: Optional[List[float]] = None,
+    desired_wrench: Optional[List[float]] = None,
+    force_limit: Optional[Dict[str, Any]] = None,
+) -> CommonResponse
+```
+
+`axis_mode` is a 6-element selection matrix: `0` position, `1` force, `2` compliant. Constant-force and compliance primitive activation is derived from `axis_mode`; primitive-level `activate` fields are no longer used.
+
+`constant_force` supports `desiredForce`, `damping`, `mass`, `rampTimeMs`, `modulationFreqHz`, and `modulationAmplitude`. When `axis_mode` contains a `FORCE` axis, `desiredForce` is required. The constant-force primitive no longer accepts `stiffness`.
+
+`compliance` supports `stiffness`, `damping`, `mass`, and `rampTimeMs`.
+
+```python
+robot.InitForceControl(
+    frame=ForceFrame.TCP,
+    axis_mode=[
+        ForceAxisMode.POSITION,
+        ForceAxisMode.POSITION,
+        ForceAxisMode.FORCE,
+        ForceAxisMode.POSITION,
+        ForceAxisMode.POSITION,
+        ForceAxisMode.POSITION,
+    ],
+    constant_force={
+        "desiredForce": [0, 0, 2, 0, 0, 0],
+        "damping": [250, 250, 250, 7.5, 7.5, 7.5],
+        "mass": [2.5, 2.5, 2.5, 0.15, 0.15, 0.15],
+        "rampTimeMs": 500,
+    },
+)
+```
+
+### StartForceControl / StopForceControl
+
+```python
+def StartForceControl(self) -> CommonResponse
+def StopForceControl(self, smooth_time_ms: int = 500) -> CommonResponse
+```
+
+`StopForceControl` may be rejected while a motion command is executing. Stop motion first, or use program-level stop to coordinate a smooth force-control exit.
+
+### TuneForceParams
+
+```python
+def TuneForceParams(
+    self,
+    stiffness: Optional[List[float]] = None,
+    damping: Optional[List[float]] = None,
+    mass: Optional[List[float]] = None,
+    desired_force: Optional[List[float]] = None,
+    kp: Optional[List[float]] = None,
+    kd: Optional[List[float]] = None,
+    ramp_time: Optional[float] = None,
+) -> CommonResponse
+```
+
+`ramp_time` is sent as `rampTime`, in ms; `0` means immediate application.
+
+### StartContactDetection
+
+```python
+def StartContactDetection(
+    self,
+    direction: List[float],
+    feed_velocity: Optional[float] = None,
+    contact_force_threshold: Optional[float] = None,
+    vel_drop_ratio: Optional[float] = None,
+    max_travel: Optional[float] = None,
+    timeout_ms: Optional[float] = None,
+) -> CommonResponse
+```
+
+`direction` must contain 6 elements; pass `max_travel` explicitly and keep it greater than 0.
+
+### SetOverforceProtection
+
+```python
+def SetOverforceProtection(
+    self,
+    enable: Optional[bool] = None,
+    force_threshold: Optional[List[float]] = None,
+    hold_ms: Optional[float] = None,
+) -> CommonResponse
+```
+
+Only provided fields are updated. `force_threshold` is `[Fx,Fy,Fz,Mx,My,Mz]`; `0` disables monitoring for that axis.
+
+### SetForceDataHealth
+
+```python
+def SetForceDataHealth(
+    self,
+    enable: Optional[bool] = None,
+    timeout_ms: Optional[float] = None,
+    max_packet_loss_ratio: Optional[float] = None,
+    packet_loss_window: Optional[int] = None,
+    force_saturation: Optional[float] = None,
+    torque_saturation: Optional[float] = None,
+) -> CommonResponse
+```
+
+Only provided fields are updated.
+
+### GetForceState
+
+```python
+def GetForceState(self) -> ForceControlState
+```
+
+`GetForceState()` returns the full state object. Per-field helpers are also available:
+
+```python
+robot.GetForceStateEnabled()       # bool
+robot.GetForceStatePending()       # bool
+robot.GetForceStateAlgo()          # int
+robot.GetForceStateValid()         # bool
+robot.GetForceStateIsContact()     # bool
+robot.GetForceStateIsOverforce()   # bool
+robot.GetForceStateHealth()        # int
+robot.GetForceStateWrenchTcp()     # List[float]
+robot.GetForceStateWrenchBase()    # List[float]
+robot.GetForceStateDesiredWrench() # List[float]
+robot.GetForceStateTrackError()    # List[float]
+robot.GetForceStateAxisMode()      # List[int]
+```
+
+---
 
 ## Utilities API Reference
 

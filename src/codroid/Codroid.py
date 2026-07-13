@@ -1819,14 +1819,15 @@ class CodroidSession:
 
     # --- 20. 力控接口 / Force Control ---
 
-    def FTSensorDriftCalibration(self, timeout_ms: int = 5000) -> CommonResponse:
+    def ZeroForceCalibration(self, calibration_time_ms: int = 1000, timeout_ms: int = 5000) -> CommonResponse:
         """
-        六维力传感器零力校准/去皮（阻塞，约 2500ms）。
+        六维力传感器零力校准/带载去皮。
 
         建议在每次进入力控前执行，以保证外力计算准确。
 
         Args:
-            timeout_ms: 超时时间 (ms)，默认 3000。超时抛出 CodroidTimeoutError。
+            calibration_time_ms: 采样时长 (ms)，默认 1000。
+            timeout_ms: 超时时间 (ms)，超时抛出 CodroidTimeoutError。
 
         Returns:
             CommonResponse: 响应对象。
@@ -1843,13 +1844,16 @@ class CodroidSession:
             sock.settimeout(timeout_ms / 1000.0)
 
         try:
-            return self._send_command("Robot/FTSensorDriftCalibration", "")
+            return self._send_command(
+                "Robot/ZeroForceCalibration",
+                {"calibrationTimeMs": int(calibration_time_ms)}
+            )
         except _socket.timeout:
             raise CodroidTimeoutError(
-                f"FTSensorDriftCalibration 超时 ({timeout_ms}ms)，请检查传感器连接。"
+                f"ZeroForceCalibration 超时 ({timeout_ms}ms)，请检查传感器连接。"
             )
         finally:
-            if sock is not None and old_timeout is not None:
+            if sock is not None:
                 try:
                     sock.settimeout(old_timeout)
                 except Exception:
@@ -1866,7 +1870,7 @@ class CodroidSession:
         force_limit: Optional[Dict[str, Any]] = None,
     ) -> CommonResponse:
         """
-        进入力控前一次性配参（导纳算法/坐标系/S矩阵/原语/M·D·K，无斜坡）。
+        进入力控前一次性配参（当前固定导纳算法/坐标系/S矩阵/原语/M·D·K，无斜坡）。
 
         Args:
             frame: 力控坐标系 (ForceFrame): 0=TCP, 1=用户系, 2=世界系。
@@ -1883,7 +1887,7 @@ class CodroidSession:
         if len(axis_mode) != 6:
             raise CodroidError("axis_mode 必须为 6 元素列表 / axis_mode must be a 6-element list.")
         db: Dict[str, Any] = {
-            "algo": 1,  # 固定导纳算法 (Admittance)
+            "algo": 1,  # 当前 SDK 固定导纳算法 (ForceControlAlgo.ADMITTANCE)
             "frame": int(frame),
             "axisMode": [int(x) for x in axis_mode],
         }
@@ -1928,6 +1932,7 @@ class CodroidSession:
         desired_force: Optional[List[float]] = None,
         kp: Optional[List[float]] = None,
         kd: Optional[List[float]] = None,
+        ramp_time: Optional[float] = None,
     ) -> CommonResponse:
         """
         在线调参（运行中调整 M/D/K、期望力，经算法斜坡平滑生效）。
@@ -1939,6 +1944,7 @@ class CodroidSession:
             desired_force: 期望力 [Fx..Trz] (N/N·m)，恒力原语斜坡加载 (可选)。
             kp: PD 力控 kp 增益 (可选，仅 PD 力控算法)。
             kd: PD 力控 kd 增益 (可选，仅 PD 力控算法)。
+            ramp_time: 本次 M/D/K 调参斜坡时长 (ms)，0 表示立即生效 (可选)。
 
         Returns:
             CommonResponse: 响应对象。
@@ -1956,7 +1962,94 @@ class CodroidSession:
             db["kp"] = kp
         if kd is not None:
             db["kd"] = kd
+        if ramp_time is not None:
+            db["rampTime"] = float(ramp_time)
         return self._send_command("Robot/tuneForceParams", db)
+
+    def StartContactDetection(
+        self,
+        direction: List[float],
+        feed_velocity: Optional[float] = None,
+        contact_force_threshold: Optional[float] = None,
+        vel_drop_ratio: Optional[float] = None,
+        max_travel: Optional[float] = None,
+        timeout_ms: Optional[float] = None,
+    ) -> CommonResponse:
+        """
+        启动接触检测原语。
+
+        Args:
+            direction: 进给方向单位向量 [Fx,Fy,Fz,Mx,My,Mz]，力控坐标系。
+            feed_velocity: 缓进给速度 (m/s)。
+            contact_force_threshold: 接触力阈值 |F·dir| (N)。
+            vel_drop_ratio: TCP 速度骤降比例判据，0=不启用。
+            max_travel: 最大进给行程 (m)，应 >0。
+            timeout_ms: 检测超时 (ms)，0=不限。
+
+        Returns:
+            CommonResponse: 响应对象。
+        """
+        if len(direction) != 6:
+            raise CodroidError("direction 必须为 6 元素列表 / direction must be a 6-element list.")
+        db: Dict[str, Any] = {"direction": direction}
+        if feed_velocity is not None:
+            db["feedVelocity"] = float(feed_velocity)
+        if contact_force_threshold is not None:
+            db["contactForceThreshold"] = float(contact_force_threshold)
+        if vel_drop_ratio is not None:
+            db["velDropRatio"] = float(vel_drop_ratio)
+        if max_travel is not None:
+            db["maxTravel"] = float(max_travel)
+        if timeout_ms is not None:
+            db["timeoutMs"] = float(timeout_ms)
+        return self._send_command("Robot/startContactDetection", db)
+
+    def SetOverforceProtection(
+        self,
+        enable: Optional[bool] = None,
+        force_threshold: Optional[List[float]] = None,
+        hold_ms: Optional[float] = None,
+    ) -> CommonResponse:
+        """
+        在线设置过力保护参数（部分更新）。
+        """
+        db: Dict[str, Any] = {}
+        if enable is not None:
+            db["enable"] = bool(enable)
+        if force_threshold is not None:
+            if len(force_threshold) != 6:
+                raise CodroidError("force_threshold 必须为 6 元素列表 / force_threshold must be a 6-element list.")
+            db["forceThreshold"] = force_threshold
+        if hold_ms is not None:
+            db["holdMs"] = float(hold_ms)
+        return self._send_command("Robot/setOverforceProtection", db)
+
+    def SetForceDataHealth(
+        self,
+        enable: Optional[bool] = None,
+        timeout_ms: Optional[float] = None,
+        max_packet_loss_ratio: Optional[float] = None,
+        packet_loss_window: Optional[int] = None,
+        force_saturation: Optional[float] = None,
+        torque_saturation: Optional[float] = None,
+    ) -> CommonResponse:
+        """
+        在线设置外力数据健康监控参数（部分更新）。
+        """
+        db: Dict[str, Any] = {}
+        if enable is not None:
+            db["enable"] = bool(enable)
+        if timeout_ms is not None:
+            db["timeoutMs"] = float(timeout_ms)
+        if max_packet_loss_ratio is not None:
+            db["maxPacketLossRatio"] = float(max_packet_loss_ratio)
+        if packet_loss_window is not None:
+            db["packetLossWindow"] = int(packet_loss_window)
+        if force_saturation is not None:
+            db["forceSaturation"] = float(force_saturation)
+        if torque_saturation is not None:
+            db["torqueSaturation"] = float(torque_saturation)
+        return self._send_command("Robot/setForceDataHealth", db)
 
     def GetForceState(self) -> "ForceControlState":
         """
@@ -1968,6 +2061,42 @@ class CodroidSession:
         from .define import ForceControlState
         resp = self._send_command("Robot/getForceState", "")
         return ForceControlState.from_db(resp.db)
+
+    def GetForceStateEnabled(self) -> bool:
+        return self.GetForceState().enabled
+
+    def GetForceStatePending(self) -> bool:
+        return self.GetForceState().pending
+
+    def GetForceStateAlgo(self) -> int:
+        return self.GetForceState().algo
+
+    def GetForceStateValid(self) -> bool:
+        return self.GetForceState().valid
+
+    def GetForceStateIsContact(self) -> bool:
+        return self.GetForceState().is_contact
+
+    def GetForceStateIsOverforce(self) -> bool:
+        return self.GetForceState().is_overforce
+
+    def GetForceStateHealth(self) -> int:
+        return self.GetForceState().health
+
+    def GetForceStateWrenchTcp(self) -> List[float]:
+        return self.GetForceState().wrench_tcp
+
+    def GetForceStateWrenchBase(self) -> List[float]:
+        return self.GetForceState().wrench_base
+
+    def GetForceStateDesiredWrench(self) -> List[float]:
+        return self.GetForceState().desired_wrench
+
+    def GetForceStateTrackError(self) -> List[float]:
+        return self.GetForceState().track_error
+
+    def GetForceStateAxisMode(self) -> List[int]:
+        return self.GetForceState().axis_mode
 
     # 支持 with 语句
     def __enter__(self):

@@ -6,6 +6,7 @@ from .Codroid import CodroidControlInterface, CodroidSession
 from .client import CodroidClient
 from .define import *
 from .define import (
+    ForceControlAlgo,
     ForceFrame,
     ForceAxisMode,
     ForceHealth,
@@ -90,6 +91,7 @@ __all__ = [
     "RobotFrame",
     "RobotPayloadFrame",
     "RobotParameters",
+    "ForceControlAlgo",
     "ForceFrame",
     "ForceAxisMode",
     "ForceHealth",

@@ -173,12 +173,16 @@ with CodroidClient(host="192.168.1.136") as robot:
 PYTHONPATH=src python examples/08_move.py --robot 192.168.8.136
 PYTHONPATH=src python examples/15_sync_motion.py --robot 192.168.8.136
 PYTHONPATH=src python examples/14_robot_parameters.py --robot 192.168.8.136
+PYTHONPATH=src python examples/16_force_control.py --robot 192.168.8.136 --demo compliance
+PYTHONPATH=src python examples/force_read_state.py 192.168.8.136
 PYTHONPATH=src python examples/codroid_test.py motion
 PYTHONPATH=src python examples/codroid_test.py s20
 PYTHONPATH=src python examples/codroid_test.py robotparam
 ```
 
 机器人设置（协议 19.x）：`GetRobotParameters`、`SetToolFrame`、`SetDefaultToolId` 等见 `examples/14_robot_parameters.py`。
+
+力控示例：`examples/16_force_control.py`、`examples/force_z_5n.py`、`examples/force_compliant_drag.py`、`examples/force_read_state.py`。当前 `InitForceControl()` 固定导纳算法，零力校准使用 `ZeroForceCalibration()`。
 
 寄存器与 S20 运动常量见仓库根目录 `AGENTS.md` §5.1。
 

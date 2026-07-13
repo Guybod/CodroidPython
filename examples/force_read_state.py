@@ -28,19 +28,20 @@ def main():
 
         try:
             while True:
-                state = robot.GetForceState()
-
                 def fmt6(arr, prec=2):
                     """安全格式化 6 元素列表，不足补零。"""
                     v = list(arr) + [0.0] * 6
                     return f"[{v[0]:7.{prec}f}, {v[1]:7.{prec}f}, {v[2]:7.{prec}f}, {v[3]:7.{prec}f}, {v[4]:7.{prec}f}, {v[5]:7.{prec}f}]"
 
-                print(f"力控启用: {state.enabled}  |  数据有效: {state.valid}  |  健康: {ForceHealth(state.health).name}")
-                print(f"  TCP 外力:  {fmt6(state.wrench_tcp)}")
-                print(f"  基座外力:  {fmt6(state.wrench_base)}")
-                print(f"  期望力:    {fmt6(state.desired_wrench)}")
-                print(f"  跟踪误差:  {fmt6(state.track_error, 4)}")
-                print(f"  接触: {state.is_contact}  |  过力: {state.is_overforce}")
+                enabled = robot.GetForceStateEnabled()
+                valid = robot.GetForceStateValid()
+                health = robot.GetForceStateHealth()
+                print(f"力控启用: {enabled}  |  数据有效: {valid}  |  健康: {ForceHealth(health).name}")
+                print(f"  TCP 外力:  {fmt6(robot.GetForceStateWrenchTcp())}")
+                print(f"  基座外力:  {fmt6(robot.GetForceStateWrenchBase())}")
+                print(f"  期望力:    {fmt6(robot.GetForceStateDesiredWrench())}")
+                print(f"  跟踪误差:  {fmt6(robot.GetForceStateTrackError(), 4)}")
+                print(f"  接触: {robot.GetForceStateIsContact()}  |  过力: {robot.GetForceStateIsOverforce()}")
                 print()
 
                 time.sleep(1)
